@@ -6,6 +6,7 @@ https://doi.org/10.1007/978-3-030-25446-9_12
 """
 
 import numpy as np
+import pandas as pd
 
 
 class Position:
@@ -104,7 +105,7 @@ class RingRoad:
         self.vehicle_length = 4.5  # Length of vehicles (meters).
         self.safe_distance = 4  # Safe distance between vehicles (meters).
         self.max_speed = 9.75  # Max speed (meters/second).
-        self.temporal_res = 0.001  # Time between updates (in seconds).
+        self.temporal_res = 0.1  # Time between updates (in seconds).
         self.spatial_res = None
         self.traffic_a = 0.5  # Coefficient for the FTL model (meters/second).
         self.traffic_b = 20  # Coefficient for the Bando-OV model (1/second).
@@ -112,11 +113,13 @@ class RingRoad:
 
         # Store state information:
         self.state = None
-        self.history = dict()  # History of states, keyed by time.
+        self.history = dict()  # History of states, keyed by time step.
+        self.all_vehicles = set()  # Set of all vehicles that were on the road at any point in time.
 
         # Initialize:
         self.random = np.random.RandomState(seed)
         self.reset_state()
+        self.archive_state()
 
     def reset_state(self):
         assert self.num_vehicles >= 2, "Need at least 1 human and 1 robot."
@@ -142,17 +145,50 @@ class RingRoad:
                 length = self.vehicle_length,
             )
             vehicles.append(human)
+        for vehicle in vehicles:
+            self.all_vehicles.add(vehicle)
         self.state = {
+            'step' : 0,
             'time' : 0.0,
             'vehicles' : vehicles,  # List of vehicles in 0,...,(N-1) index order, with A.V. at index 0.
-            'all_vehicles' : set(vehicles),  # Set of all vehicles that have been part of the simulation.
         }
 
     def copy_state(self):
         state = self.state.copy()
         state['vehicles'] = state['vehicles'].copy()
-        state['all_vehicles'] = state['all_vehicles'].copy()
         return state
+
+    def archive_state(self):
+        for vehicle in self.state['vehicles']:
+            vehicle.archive_state()
+        self.history[self.step] = self.copy_state()
+
+    def get_vehicle_state_table(self, key):
+        """
+        Get a DataFrame of a state value (specified by key) for each vehicle (column) at each time step (row).
+        """
+        table = []
+        # Get list of all vehicles, sorted by id:
+        vehicles = sorted(self.all_vehicles, key=lambda vehicle: vehicle.id)
+        for vehicle in vehicles:
+            df = vehicle.get_state_table(keys=['step','time',key])
+            df = df.rename(columns={key:vehicle.id}).set_index(['step','time'])
+            table.append( df ) 
+        table = pd.concat(table, axis=1)
+        table.columns.name = 'vehicle_id'
+        return table
+
+    def get_vehicle_pos_table(self):
+        """Get a DataFrame of a position for each vehicle (column) at each time step (row)."""
+        return self.get_vehicle_state_table(key='pos')
+
+    def get_vehicle_vel_table(self):
+        """Get a DataFrame of a velocity for each vehicle (column) at each time step (row)."""
+        return self.get_vehicle_state_table(key='vel')
+
+    def get_vehicle_acc_table(self):
+        """Get a DataFrame of a acceleration for each vehicle (column) at each time step (row)."""
+        return self.get_vehicle_state_table(key='acc')
 
     def get_vehicle_index(self, vehicle):
         """
@@ -185,9 +221,33 @@ class RingRoad:
         lead_vehicle = self.state['vehicles'][lead_index]
         return lead_vehicle
 
+    def run_step(self):
+        """
+        Perform simulation update for one time step.
+        """
+        self.state['step'] += 1
+        self.state['time'] += self.dt
+
+        # TEST #
+        for vehicle in self.state['vehicles']:
+            vehicle.state['step'] = self.state['step']
+            vehicle.state['time'] = self.state['time']
+            vehicle.state['pos'] += self.random.randint(1,3)
+
+        # Archive environment state:
+        self.archive_state()
+
+    def run(self, steps=100):
+        for s in range(steps):
+            self.run_step()
+
     @property
     def vehicles(self):
         return self.state['vehicles'].copy()
+
+    @property
+    def step(self):
+        return self.state['step']
 
     @property
     def t(self):
@@ -214,7 +274,7 @@ class RingRoad:
 
     def __str__(self):
         s = ""
-        s += self.__repr__() + " at time {}:".format(self.t) + "\n"
+        s += self.__repr__() + " at step {} (t={}):".format(self.step, self.t) + "\n"
         for index,vehicle in enumerate(self.state['vehicles']):
             s += "    [{}] ".format(index) + vehicle.__str__() + "\n"
         return s
@@ -240,7 +300,7 @@ class Vehicle:
 
         # Store state information:
         self.state = None
-        self.history = dict()  # History of states, keyed by time.
+        self.history = dict()  # History of states, keyed by time step.
 
         # Initialize:
         self.reset_state()
@@ -257,15 +317,46 @@ class Vehicle:
         return self.state.copy()
 
     def archive_state(self):
-        self.history[self.env.t] = self.copy_state()
+        state = self.copy_state()
+        state['pos'] = state['pos'].x  # Extract position from Position object.
+        state['time'] = self.env.t
+        state['step'] = self.env.step
+        self.history[self.env.step] = state
+
+    def get_state_table(self, keys=['step', 'time', 'pos', 'vel', 'acc']):
+        """
+        Build a DataFrame of the state history
+        (with specified keys as columns and all available time steps as rows).
+        """
+        table = []
+        for state in self.history.values():
+            table.append( {key : state[key] for key in keys if key in state.keys()} )
+        table = pd.DataFrame(table)
+        return table
+
+    @property
+    def l(self):
+        return self.length
 
     @property
     def x(self):
         return self.state['pos'].x
 
     @property
-    def l(self):
-        return self.length
+    def pos(self):
+        return self.state['pos']
+
+    @property
+    def vel(self):
+        return self.state['vel']
+
+    @property
+    def acc(self):
+        return self.state['acc']
+    
+    def __repr__(self):
+        typ = 'Vehicle' if self.type is None else self.type.capitalize()
+        return "<{}(id={})@x={:.2f}>".format(typ, self.id, self.x)
 
 class Human(Vehicle):
 
