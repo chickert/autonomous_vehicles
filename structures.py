@@ -160,7 +160,7 @@ class RingRoad:
         """
         index = None
         for i,v in enumerate(self.state['vehicles']):
-            if v.id == vehicle_id:
+            if v.id == vehicle.id:
                 index = i
                 break
         return index
