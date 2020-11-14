@@ -43,24 +43,9 @@ class Position:
     @L.setter
     def L(self, L):
         raise AttributeError("The length property is immutable.")
-    
-    def distance_to(self, other, reverse=False):
-        """
-        Return the distance from self to other (i.e. by how much does other lead self?)
-        If reverse=True, returns the distance from other to self, travelling in direction of the road.
-        Distances are always positive and are measured in the direction of traffic.
-        """
-        # Convert to Position (should work event if other is already a Position):
-        other = Position(other, self.L)
-        # Apply reverse case:
-        if reverse:
-            return other.distance_to(self)
-        # Get positions as numeric values:
-        s = self.x
-        o = other.x
-        # Get difference:
-        dist = (o - s) % self.L
-        return dist
+
+    def __repr__(self):
+        return "Position(x={}, L={})".format(self.x, self.L)
 
     def __eq__(self, other):
         """
@@ -91,9 +76,24 @@ class Position:
         return Position(x=new_x, L=self.L)
     def __rsub__(self, other):
         raise NotImplementedError("Reverse operations are ambigous for Position objects -- try Position - scalar instead.")
-
-    def __repr__(self):
-        return "Position(x={}, L={})".format(self.x, self.L)
+    
+    def distance_to(self, other, reverse=False):
+        """
+        Return the distance from self to other (i.e. by how much does other lead self?)
+        If reverse=True, returns the distance from other to self, travelling in direction of the road.
+        Distances are always positive and are measured in the direction of traffic.
+        """
+        # Convert to Position (should work event if other is already a Position):
+        other = Position(other, self.L)
+        # Apply reverse case:
+        if reverse:
+            return other.distance_to(self)
+        # Get positions as numeric values:
+        s = self.x
+        o = other.x
+        # Get difference:
+        dist = (o - s) % self.L
+        return dist
 
 class RingRoad:
 
@@ -120,6 +120,44 @@ class RingRoad:
         self.random = np.random.RandomState(seed)
         self.reset_state()
         self.archive_state()
+
+    @property
+    def vehicles(self):
+        return self.state['vehicles'].copy()
+
+    @property
+    def step(self):
+        return self.state['step']
+
+    @property
+    def t(self):
+        return self.state['time']
+
+    @property
+    def dt(self):
+        return self.temporal_res
+
+    @property
+    def L(self):
+        return self.ring_length
+
+    @property
+    def l_v(self):
+        return self.vehicle_length
+
+    @property
+    def N(self):
+        return len(self.state['vehicles'])
+
+    def __repr__(self):
+        return "RingRoad(num_vehicles={}, ring_length={}, seed={})".format(self.num_vehicles, self.ring_length, self.seed)
+
+    def __str__(self):
+        s = ""
+        s += self.__repr__() + " at step {} (t={}):".format(self.step, self.t) + "\n"
+        for index,vehicle in enumerate(self.state['vehicles']):
+            s += "    [{}] ".format(index) + vehicle.__str__() + "\n"
+        return s
 
     def reset_state(self):
         assert self.num_vehicles >= 2, "Need at least 1 human and 1 robot."
@@ -244,44 +282,6 @@ class RingRoad:
         for s in range(steps):
             self.run_step()
 
-    @property
-    def vehicles(self):
-        return self.state['vehicles'].copy()
-
-    @property
-    def step(self):
-        return self.state['step']
-
-    @property
-    def t(self):
-        return self.state['time']
-
-    @property
-    def dt(self):
-        return self.temporal_res
-
-    @property
-    def L(self):
-        return self.ring_length
-
-    @property
-    def l_v(self):
-        return self.vehicle_length
-
-    @property
-    def N(self):
-        return len(self.state['vehicles'])
-
-    def __repr__(self):
-        return "RingRoad(num_vehicles={}, ring_length={}, seed={})".format(self.num_vehicles, self.ring_length, self.seed)
-
-    def __str__(self):
-        s = ""
-        s += self.__repr__() + " at step {} (t={}):".format(self.step, self.t) + "\n"
-        for index,vehicle in enumerate(self.state['vehicles']):
-            s += "    [{}] ".format(index) + vehicle.__str__() + "\n"
-        return s
-
 class Vehicle:
 
     all_vehicles = []
@@ -307,6 +307,30 @@ class Vehicle:
 
         # Initialize:
         self.reset_state()
+    
+    def __repr__(self):
+        typ = 'Vehicle' if self.type is None else self.type.capitalize()
+        return "<{}(id={})@x={:.2f}>".format(typ, self.id, self.x)
+
+    @property
+    def l(self):
+        return self.length
+
+    @property
+    def x(self):
+        return self.state['pos'].x
+
+    @property
+    def pos(self):
+        return self.state['pos']
+
+    @property
+    def vel(self):
+        return self.state['vel']
+
+    @property
+    def acc(self):
+        return self.state['acc']
 
     def reset_state(self):
         self.state = {
@@ -346,30 +370,6 @@ class Vehicle:
         table = pd.DataFrame(table, columns=keys, index=steps)
         return table
 
-    @property
-    def l(self):
-        return self.length
-
-    @property
-    def x(self):
-        return self.state['pos'].x
-
-    @property
-    def pos(self):
-        return self.state['pos']
-
-    @property
-    def vel(self):
-        return self.state['vel']
-
-    @property
-    def acc(self):
-        return self.state['acc']
-    
-    def __repr__(self):
-        typ = 'Vehicle' if self.type is None else self.type.capitalize()
-        return "<{}(id={})@x={:.2f}>".format(typ, self.id, self.x)
-
 class Human(Vehicle):
 
     def __init__(self, *args, **kwargs):
@@ -396,10 +396,6 @@ class Robot(Vehicle):
         
         # Initialize:
         self.reset_state()
-    
-    def reset_state(self):
-        super().reset_state()
-        self.state['active'] = True  # Flag to determine autonomous control.
 
     @property
     def active(self):
@@ -419,6 +415,10 @@ class Robot(Vehicle):
             self.state['pos'].x, self.state['vel'], self.state['acc'],
         )
         return s
+    
+    def reset_state(self):
+        super().reset_state()
+        self.state['active'] = True  # Flag to determine autonomous control.
 
 class Controller:
 
