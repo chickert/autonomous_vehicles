@@ -282,9 +282,9 @@ class RingRoad:
             vehicle.state['index'] = index
             vehicle.state['step'] = self.state['step']
             vehicle.state['time'] = self.state['time']
-            vehicle.state['acc'] = control[index]
-            vehicle.state['vel'] += vehicle.state['acc']*self.dt
-            vehicle.state['pos'] += vehicle.state['vel']*self.dt
+            vehicle.acc = control[index]
+            vehicle.vel += vehicle.acc/self.dt
+            vehicle.pos += vehicle.vel*self.dt
 
         # Increment time step for next iteration:
         self.state['step'] += 1
@@ -458,7 +458,7 @@ class Vehicle:
         # Set constraints:
         self.min_vel = 0
         self.max_vel = float("+Inf")
-        self.min_acc = 0
+        self.min_acc = float("-Inf")
         self.max_acc = float("+Inf")
 
         # Store state information:
