@@ -8,6 +8,9 @@ https://doi.org/10.1007/978-3-030-25446-9_12
 import numpy as np
 import pandas as pd
 
+import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+
 
 class Position:
 
@@ -281,6 +284,84 @@ class RingRoad:
     def run(self, steps=100):
         for s in range(steps):
             self.run_step()
+
+
+    def visualize(self, step=None, ax=None, draw_cars_to_scale=False):
+
+        # Plot latest step by default:
+        if step is None:
+            step = self.step
+
+        # Get corresponding state:
+        state = self.history[step]
+
+        # Set plotting options:
+        road_width = 20.
+        scaled_car_width = 10.
+        point_car_size = 8.
+        road_color = 'silver'
+        hv_color = 'firebrick'
+        av_color = 'seagreen'
+
+        # Create plot:
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='polar')
+
+        # Find the radius of the ring given the RingRoad length
+        road_radius = self.ring_length / (2 * np.pi)
+
+        # Collect artists (for pyplot animation):
+        artists = []
+        
+        # Plot a circle: https://stackoverflow.com/a/19828753
+        polar_transform = ax.transProjectionAffine + ax.transAxes
+        ring_road = plt.Circle((0, 0), road_radius, color=road_color, lw=road_width, fill=False, transform=polar_transform)
+        ax.add_artist(ring_road)
+        artists.append(ring_road)
+
+        # Now plot the cars after transforming the 1-dimensional location of each to the polar coordinate system
+        for car in state['vehicles']:
+
+            # Transform the 1-D coord to polar system
+            normalized_pos = car.x / self.ring_length
+            car_theta = normalized_pos * (2 * np.pi)
+
+            if car.type=='human':
+                car_color = hv_color
+            elif car.type=='robot':
+                car_color = hv_color
+            else:
+                raise NotImplementedError
+
+            # Now plot the cars, whether to scale or not, with color according to whether each is an AV or human driver
+            # Note: for large ring roads, it is likely better to NOT draw to scale, for easier visualization
+            if draw_cars_to_scale:
+                normalized_car_length = self.vehicle_length / self.ring_length
+                polar_car_length = normalized_car_length * (2 * np.pi)
+                car_arc_theta = np.arange(start=car_theta - polar_car_length/2,
+                                    stop=car_theta + polar_car_length/2,
+                                    step=0.005)
+                car_arc_radius = np.repeat(road_radius, len(car_arc_theta))
+                
+                car_arc = ax.plot(car_arc_theta, car_arc_radius, color=car_color, lw=scaled_car_width)
+                artists.append(car_arc)
+
+            else:
+                car_point, = ax.plot(car_theta, road_radius, color=car_color, marker='s', markersize=point_car_size)
+                artists.append(car_point)
+        
+        # Hide ticks and gridlines:
+        ax.set_yticklabels([])
+        ax.set_xticklabels([])
+        ax.spines['polar'].set_visible(False)
+        ax.grid(False)
+
+        ax.set_xlim((0,np.pi*2))
+        ax.set_ylim((0,road_radius*1.05))
+        
+        artists = tuple(artists)
+        return fig, ax
+
 
 class Vehicle:
 
