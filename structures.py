@@ -336,44 +336,51 @@ class RingRoad:
         
         # Plot a circle: https://stackoverflow.com/a/19828753
         polar_transform = ax.transProjectionAffine + ax.transAxes
-        ring_road = plt.Circle((0, 0), road_radius, color=road_color, lw=road_width, fill=False, transform=polar_transform)
+        ring_road = plt.Circle((0, 0), road_radius, color=road_color, zorder=1, lw=road_width, fill=False, transform=polar_transform)
         ax.add_artist(ring_road)
         artists.append(ring_road)
 
         # Now plot the cars after transforming the 1-dimensional location of each to the polar coordinate system
         for car in state['vehicles']:
 
+            # Get relevant state variables (each row is a time step and each column is a variable):
+            car_state = car.get_state_table(keys=['index','pos'], steps=[step])
+            car_state = car_state.iloc[0].to_dict()  # Convert the single table row to a dictionary.
+            car_state['index'] = int(car_state['index'])  # Make sure index is an integer.
+
             # Transform the 1-D coord to polar system
-            normalized_pos = car.x / self.ring_length
+            normalized_pos = car_state['pos'] / self.ring_length
             car_theta = normalized_pos * (2 * np.pi)
 
             if car.type=='human':
                 car_color = hv_color
+                car_zorder = 2
             elif car.type=='robot':
                 car_color = av_color
+                car_zorder = 3
             else:
                 raise NotImplementedError
 
             # Now plot the cars, whether to scale or not, with color according to whether each is an AV or human driver
             # Note: for large ring roads, it is likely better to NOT draw to scale, for easier visualization
             if draw_cars_to_scale:
-                normalized_car_length = self.vehicle_length / self.ring_length
+                normalized_car_length = car.length / self.ring_length
                 polar_car_length = normalized_car_length * (2 * np.pi)
                 car_arc_theta = np.arange(start=car_theta - polar_car_length/2,
                                     stop=car_theta + polar_car_length/2,
                                     step=0.005)
                 car_arc_radius = np.repeat(road_radius, len(car_arc_theta))
                 
-                car_arc = ax.plot(car_arc_theta, car_arc_radius, color=car_color, lw=scaled_car_width)
+                car_arc = ax.plot(car_arc_theta, car_arc_radius, color=car_color, zorder=car_zorder, lw=scaled_car_width)
                 artists.append(car_arc)
 
             else:
-                car_point, = ax.plot(car_theta, road_radius, color=car_color, marker='s', markersize=point_car_size)
+                car_point, = ax.plot(car_theta, road_radius, color=car_color, zorder=car_zorder, marker='s', markersize=point_car_size)
                 artists.append(car_point)
 
             # Add text:
             if label_cars:
-                label = ax.text(car_theta, road_radius*1.15, "{}".format(car.id), fontsize=10, ha='center', va='center')
+                label = ax.text(car_theta, road_radius*1.15, "{}".format(car_state['index']), fontsize=10, ha='center', va='center')
                 artists.append(label)
 
         # Add text:
