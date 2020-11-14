@@ -442,6 +442,106 @@ class RingRoad:
 
         return anim
 
+    def plot_positions(self):
+        """
+        Plot positions of vehicles (y axis) over time (x axis):
+        """
+        
+        # Set plotting options:
+        hv_color = 'firebrick'
+        av_color = 'seagreen'
+        
+        # Create plot:
+        fig,ax = plt.subplots(1,1, figsize=(16,4))
+
+        # Collect artists (for pyplot animation):
+        artists = []
+        
+        # Plot each vehicle:
+        for vehicle in self.all_vehicles:
+            # Get a table of state history for this vehicle:
+            table = vehicle.get_state_table(keys=['step','time','pos'])
+            # Set plotting options:
+            if vehicle.type=='human':
+                color = hv_color
+                alpha = 0.5
+                zorder = 2
+            elif vehicle.type=='robot':
+                color = av_color
+                alpha = 0.75
+                zorder = 3
+            else:
+                raise NotImplementedError
+            # Plot a separate chunk for each revolution:
+            prev_break = 0
+            prev_row = None
+            for i in range(len(table)):
+                this_row = table.iloc[i]
+                # Determine whether to plot new chunk:
+                if prev_row is None:
+                    new_chunk = False  # First row.
+                elif i == len(table)-1:
+                    new_chunk = True  # Last row.
+                elif this_row['pos'] < prev_row['pos']:
+                    new_chunk = True  # Row with wrap around.
+                else:
+                    new_chunk = False  # All other rows.
+                # Plot new chunk if needed:
+                if new_chunk:
+                    df = table.iloc[prev_break:i]
+                    lines, = ax.plot(df['time'],df['pos'], color=color, alpha=alpha, zorder=zorder)
+                    artists.append(lines)
+                    prev_break = i
+                prev_row = this_row
+                
+        # Set axes:
+        #ax.set_title("Position over time")
+        ax.set_xlabel("time (seconds)")
+        ax.set_ylabel("position (meters)")
+        
+        return fig, ax
+
+    def plot_velocities(self):
+        """
+        Plot velocities of vehicles (y axis) over time (x axis):
+        """
+        
+        # Set plotting options:
+        hv_color = 'firebrick'
+        av_color = 'seagreen'
+        
+        # Create plot:
+        fig,ax = plt.subplots(1,1, figsize=(16,4))
+
+        # Collect artists (for pyplot animation):
+        artists = []
+        
+        # Plot each vehicle:
+        for vehicle in self.all_vehicles:
+            # Get a table of state history for this vehicle:
+            table = vehicle.get_state_table(keys=['step','time','vel'])
+            # Set plotting options:
+            if vehicle.type=='human':
+                color = hv_color
+                alpha = 0.5
+                zorder = 2
+            elif vehicle.type=='robot':
+                color = av_color
+                alpha = 0.75
+                zorder = 3
+            else:
+                raise NotImplementedError
+            # Plot:
+            lines, = ax.plot(table['time'],table['vel'], color=color, alpha=alpha, zorder=zorder)
+            artists.append(lines)
+                
+        # Set axes:
+        #ax.set_title("Velocity over time")
+        ax.set_xlabel("time (seconds)")
+        ax.set_ylabel("velocity (meters/second)")
+        
+        return fig, ax
+
 class Vehicle:
 
     all_vehicles = []
