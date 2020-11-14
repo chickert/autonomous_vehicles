@@ -50,6 +50,11 @@ class PID(Controller):
         I make that assumption below, but we should discuss or just double-check
         """
         v_d = np.mean(self.stored_velocities[-self.m:])
+
+        """
+        NEED TO UPDATE this to take self.m * (1/time_discretization) so for m=38 and time disc of 0.1s, it takes 380
+        values instead of 38 values! 
+        """
         return v_d
 
     def calc_target_velocity(self, delta_x):
