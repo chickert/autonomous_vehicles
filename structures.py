@@ -286,7 +286,7 @@ class RingRoad:
             vehicle.state['step'] = self.state['step']
             vehicle.state['time'] = self.state['time']
             vehicle.acc = control[index]
-            vehicle.vel += vehicle.acc/self.dt
+            vehicle.vel += vehicle.acc*self.dt
             vehicle.pos += vehicle.vel*self.dt
 
         # Increment time step for next iteration:
