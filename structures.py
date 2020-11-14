@@ -8,6 +8,8 @@ https://doi.org/10.1007/978-3-030-25446-9_12
 import numpy as np
 import pandas as pd
 
+import plotly.io
+import matplotlib.animation
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 
@@ -160,7 +162,6 @@ class RingRoad:
         s += self.__repr__() + " at step {} (t={}):".format(self.step, self.t) + "\n"
         for index,vehicle in enumerate(self.state['vehicles']):
             s += "    [{}] ".format(index) + vehicle.__str__() + "\n"
-        return s
 
     def reset_state(self):
         assert self.num_vehicles >= 2, "Need at least 1 human and 1 robot."
@@ -269,10 +270,11 @@ class RingRoad:
         """
 
         # TEST #
-        for vehicle in self.state['vehicles']:
+        for index,vehicle in enumerate(self.state['vehicles']):
             vehicle.state['step'] = self.state['step']
             vehicle.state['time'] = self.state['time']
             vehicle.state['pos'] += self.random.randint(1,3)
+            vehicle.state['index'] = index
 
         # Increment time step for next iteration:
         self.state['step'] += 1
@@ -285,8 +287,7 @@ class RingRoad:
         for s in range(steps):
             self.run_step()
 
-
-    def visualize(self, step=None, ax=None, draw_cars_to_scale=False):
+    def visualize(self, step=None, draw_cars_to_scale=False, label_step=True, label_cars=True):
 
         # Plot latest step by default:
         if step is None:
@@ -303,9 +304,16 @@ class RingRoad:
         hv_color = 'firebrick'
         av_color = 'seagreen'
 
-        # Create plot:
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='polar')
+        # Create plot (or get current axes if animating):
+        if not hasattr(self, '_animation'):
+            self._animation = None
+        if self._animation:
+            fig = self._animation['fig']
+            ax = self._animation['ax']
+            ax.clear()
+        else:
+            fig = plt.figure()
+            ax = fig.add_subplot(projection='polar')
 
         # Find the radius of the ring given the RingRoad length
         road_radius = self.ring_length / (2 * np.pi)
@@ -329,7 +337,7 @@ class RingRoad:
             if car.type=='human':
                 car_color = hv_color
             elif car.type=='robot':
-                car_color = hv_color
+                car_color = av_color
             else:
                 raise NotImplementedError
 
@@ -349,6 +357,16 @@ class RingRoad:
             else:
                 car_point, = ax.plot(car_theta, road_radius, color=car_color, marker='s', markersize=point_car_size)
                 artists.append(car_point)
+
+            # Add text:
+            if label_cars:
+                label = ax.text(car_theta, road_radius*1.15, "{}".format(car.id), fontsize=10, ha='center', va='center')
+                artists.append(label)
+
+        # Add text:
+        if label_step:
+            label = ax.text(0,0, "t = {:.1f} s".format(state['time']), fontsize=14, ha='center', va='center')
+            artists.append(label)
         
         # Hide ticks and gridlines:
         ax.set_yticklabels([])
@@ -359,9 +377,50 @@ class RingRoad:
         ax.set_xlim((0,np.pi*2))
         ax.set_ylim((0,road_radius*1.05))
         
-        artists = tuple(artists)
-        return fig, ax
+        # Return artists or figure:
+        if self._animation:
+            return tuple(artists)
+        else:
+            return fig, ax
 
+    def animate(self, steps=None, *args, **kwargs):
+        """
+        Plot the history of the simulation (optionally specifying steps as an iterable).
+        (Takes same options as `visualize` function).
+        """
+        
+        # Create workspace for animation:
+        self._animation = dict()
+
+        # Get start and end steps:
+        if steps is None:
+            steps = range(self.step+1)
+
+        # Define plot update function:
+        def func(frame):
+            return self.visualize(step=frame, *args, **kwargs)
+        def init_func():
+            return self.visualize(step=0, *args, **kwargs)
+
+        # Build animation:
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='polar')
+        self._animation['fig'] = fig
+        self._animation['ax'] = ax
+        anim = matplotlib.animation.FuncAnimation(
+            fig,
+            func,
+            frames=steps,
+            #init_func=init_func,
+            interval=200,
+            blit=True,
+            repeat=False,
+        )
+
+        # Clear workspace:
+        self._animation = None
+
+        return anim
 
 class Vehicle:
 
@@ -415,6 +474,7 @@ class Vehicle:
 
     def reset_state(self):
         self.state = {
+            'index' : None,  # Set by environment.
             'pos' : Position(x=self.init_pos, L=self.env.L),
             'vel' : self.init_vel,
             'acc' : self.init_acc,
