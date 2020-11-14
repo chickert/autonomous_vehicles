@@ -163,32 +163,33 @@ class RingRoad:
             vehicle.archive_state()
         self.history[self.step] = self.copy_state()
 
-    def get_vehicle_state_table(self, key):
+    def get_vehicle_state_table(self, key, steps=None):
         """
         Get a DataFrame of a state value (specified by key) for each vehicle (column) at each time step (row).
+        If steps is specified (as an iterable), gets specific time steps; otherwise gets all available time steps.
         """
         table = []
         # Get list of all vehicles, sorted by id:
         vehicles = sorted(self.all_vehicles, key=lambda vehicle: vehicle.id)
         for vehicle in vehicles:
-            df = vehicle.get_state_table(keys=['step','time',key])
+            df = vehicle.get_state_table(keys=['step','time',key], steps=steps)
             df = df.rename(columns={key:vehicle.id}).set_index(['step','time'])
             table.append( df ) 
         table = pd.concat(table, axis=1)
         table.columns.name = 'vehicle_id'
         return table
 
-    def get_vehicle_pos_table(self):
+    def get_vehicle_pos_table(self, steps=None):
         """Get a DataFrame of a position for each vehicle (column) at each time step (row)."""
-        return self.get_vehicle_state_table(key='pos')
+        return self.get_vehicle_state_table(key='pos', steps=steps)
 
-    def get_vehicle_vel_table(self):
+    def get_vehicle_vel_table(self, steps=None):
         """Get a DataFrame of a velocity for each vehicle (column) at each time step (row)."""
-        return self.get_vehicle_state_table(key='vel')
+        return self.get_vehicle_state_table(key='vel', steps=steps)
 
-    def get_vehicle_acc_table(self):
+    def get_vehicle_acc_table(self, steps=None):
         """Get a DataFrame of a acceleration for each vehicle (column) at each time step (row)."""
-        return self.get_vehicle_state_table(key='acc')
+        return self.get_vehicle_state_table(key='acc', steps=steps)
 
     def get_vehicle_index(self, vehicle):
         """
@@ -225,14 +226,16 @@ class RingRoad:
         """
         Perform simulation update for one time step.
         """
-        self.state['step'] += 1
-        self.state['time'] += self.dt
 
         # TEST #
         for vehicle in self.state['vehicles']:
             vehicle.state['step'] = self.state['step']
             vehicle.state['time'] = self.state['time']
             vehicle.state['pos'] += self.random.randint(1,3)
+
+        # Increment time step for next iteration:
+        self.state['step'] += 1
+        self.state['time'] += self.dt
 
         # Archive environment state:
         self.archive_state()
@@ -323,15 +326,24 @@ class Vehicle:
         state['step'] = self.env.step
         self.history[self.env.step] = state
 
-    def get_state_table(self, keys=['step', 'time', 'pos', 'vel', 'acc']):
+    def get_history(self, steps=None):
+        """
+        Get a dictionary of the state history for the specified steps (iterable).
+        """
+
+    def get_state_table(self, keys=['step', 'time', 'pos', 'vel', 'acc'], steps=None):
         """
         Build a DataFrame of the state history
         (with specified keys as columns and all available time steps as rows).
+        If steps is specified (as an iterable), gets specific time steps; otherwise gets all available time steps.
         """
         table = []
-        for state in self.history.values():
+        if steps is None:
+            steps = self.history.keys()
+        for step in steps:
+            state = self.history[step]
             table.append( {key : state[key] for key in keys if key in state.keys()} )
-        table = pd.DataFrame(table)
+        table = pd.DataFrame(table, columns=keys, index=steps)
         return table
 
     @property
