@@ -171,8 +171,8 @@ class RingRoad:
         d_start = self.ring_length / self.num_vehicles
         robot = Robot(
             env=self,
-            active_controller = BandoFTL(env=self, a=self.traffic_a, b=self.traffic_b),
-            passive_controller = PID(env=self),
+            active_controller = PID(env=self, safe_distance=self.safe_distance, gamma=2.0, m=38),
+            passive_controller = BandoFTL(env=self, a=self.traffic_a, b=self.traffic_b),
             init_pos = 0.0,
             init_vel = 0.0,
             init_acc = 0.0,
@@ -272,12 +272,19 @@ class RingRoad:
         Perform simulation update for one time step.
         """
 
-        # TEST #
+        # Calcualte control for each vehicle:
+        control = dict()  # Keyed by index.
         for index,vehicle in enumerate(self.state['vehicles']):
+            control[index] = vehicle.controller.calculate(vehicle)
+
+        # Apply control for each vehicle:
+        for index,vehicle in enumerate(self.state['vehicles']):
+            vehicle.state['index'] = index
             vehicle.state['step'] = self.state['step']
             vehicle.state['time'] = self.state['time']
-            vehicle.state['pos'] += self.random.randint(1,3)
-            vehicle.state['index'] = index
+            vehicle.state['acc'] = control[index]
+            vehicle.state['vel'] += vehicle.state['acc']*self.dt
+            vehicle.state['pos'] += vehicle.state['vel']*self.dt
 
         # Increment time step for next iteration:
         self.state['step'] += 1
@@ -429,20 +436,30 @@ class Vehicle:
 
     all_vehicles = []
 
-    def __init__(self, env, controller, init_pos=0.0, init_vel=0.0, init_acc=0.0, length=4.5):
+    def __init__(self, env, controller=None, init_pos=0.0, init_vel=0.0, init_acc=0.0, length=4.5):
 
         # Generate unique ID and add to master list:
         self.id = len(Vehicle.all_vehicles)
         Vehicle.all_vehicles.append(self)
 
+        # Use null contoller as placeholder:
+        if controller is None:
+            controller = Controller(env)
+
         # Store properties:
+        self.type = None  # 'robot' or 'human'
         self.env = env
         self.controller = controller
         self.init_pos = init_pos
         self.init_vel = init_vel
         self.init_acc = init_acc
         self.length = length
-        self.type = None  # 'robot' or 'human'
+        
+        # Set constraints:
+        self.min_vel = 0
+        self.max_vel = float("+Inf")
+        self.min_acc = 0
+        self.max_acc = float("+Inf")
 
         # Store state information:
         self.state = None
@@ -475,6 +492,22 @@ class Vehicle:
     def acc(self):
         return self.state['acc']
 
+    @pos.setter
+    def pos(self, pos):
+        self.state['pos'] = Position(x=pos, L=self.env.L)
+
+    @vel.setter
+    def vel(self, vel):
+        vel = max(vel, self.min_vel)
+        vel = min(vel, self.max_vel)
+        self.state['vel'] = vel
+
+    @acc.setter
+    def acc(self, acc):
+        acc = max(acc, self.min_acc)
+        acc = min(acc, self.max_acc)
+        self.state['acc'] = acc
+
     def reset_state(self):
         self.state = {
             'index' : None,  # Set by environment.
@@ -493,11 +526,6 @@ class Vehicle:
         state['time'] = self.env.t
         state['step'] = self.env.step
         self.history[self.env.step] = state
-
-    def get_history(self, steps=None):
-        """
-        Get a dictionary of the state history for the specified steps (iterable).
-        """
 
     def get_state_table(self, keys=['step', 'time', 'pos', 'vel', 'acc'], steps=None):
         """
