@@ -14,6 +14,9 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 
 
+from controllers import Controller, BandoFTL, PID
+
+
 class Position:
 
     TOL = 1e-9  # Tolerance for floating point comparisons.
@@ -560,23 +563,3 @@ class Robot(Vehicle):
     def reset_state(self):
         super().reset_state()
         self.state['active'] = True  # Flag to determine autonomous control.
-
-class Controller:
-
-    def __init__(self, env):
-        self.env = env
-        self.type = None  # 'BandoFTL' or 'PID', etc
-
-class BandoFTL(Controller):
-
-    def __init__(self, env, a, b):
-        super().__init__(env)
-        self.type = 'BandoFTL'
-        self.a = a
-        self.b = b
-
-class PID(Controller):
-
-    def __init__(self, env):
-        super().__init__(env)
-        self.type = 'PID'
