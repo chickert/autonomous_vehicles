@@ -36,10 +36,10 @@ class BandoFTL(Controller):
         assert self.env == this_vehicle.env, "Cannot mix environments."
         
         # TEST #
-        if self.env.t <= 20.0:
-            return 1.0 / (self.env.dt**2)
+        if self.env.t <= 10.0:
+            return 0.25
         else:
-            return 0.0 
+            return 0.0 + self.env.random.normal()
 
 
 class PID(Controller):
