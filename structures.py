@@ -164,7 +164,8 @@ class RingRoad:
         s = ""
         s += self.__repr__() + " at step {} (t={}):".format(self.step, self.t) + "\n"
         for index,vehicle in enumerate(self.state['vehicles']):
-            s += "    [{}] ".format(index) + vehicle.__str__() + "\n"
+            s += "  [{}] ".format(index) + vehicle.__str__() + "\n"
+        return s
 
     def reset_state(self):
         assert self.num_vehicles >= 2, "Need at least 1 human and 1 robot."
@@ -178,6 +179,7 @@ class RingRoad:
             init_acc = 0.0,
             length = self.vehicle_length,
         )
+        robot.state['index'] = 0
         robot.active = False
         vehicles = [robot]
         for index in range(1,self.num_vehicles):
@@ -189,6 +191,7 @@ class RingRoad:
                 init_acc = 0.0,
                 length = self.vehicle_length,
             )
+            human.state['index'] = index
             vehicles.append(human)
         for vehicle in vehicles:
             self.all_vehicles.add(vehicle)
@@ -527,7 +530,7 @@ class Vehicle:
         state['step'] = self.env.step
         self.history[self.env.step] = state
 
-    def get_state_table(self, keys=['step', 'time', 'pos', 'vel', 'acc'], steps=None):
+    def get_state_table(self, keys=['step', 'time', 'index', 'pos', 'vel', 'acc'], steps=None):
         """
         Build a DataFrame of the state history
         (with specified keys as columns and all available time steps as rows).
