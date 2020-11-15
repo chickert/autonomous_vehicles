@@ -22,12 +22,29 @@ class Controller:
 
 
 class BandoFTL(Controller):
+    """
+    Controller for human driver
+    using a combination of follow-the-leader (FTL)
+    and Bando Optimal Velocity models.
+    """
 
-    def __init__(self, env, a, b):
+    def __init__(self, env, a, b, C=1):
         super().__init__(env)
         self.type = 'BandoFTL'
-        self.a = a
-        self.b = b
+        self.C = C  # Coefficient for FTL.
+        self.a = a  # Weight of FTL model.
+        self.b = b  # Weight of Bando/OV model:
+
+    def ftl(self, delta_x, delta_v):
+        C = self.C
+        return C * delta_v / delta_x
+
+    def bando(self, delta_x):
+        d = delta_x
+        v_max = self.env.max_speed
+        l_v = self.env.vehicle_length
+        d_s = self.env.safe_distance
+        return v_max * ( np.tanh(d-l_v-d_s) + np.tanh(l_v+d_s)) / ( 1 + np.tanh(l_v+d_s))
 
     def calculate(self, this_vehicle):
         """
@@ -35,11 +52,23 @@ class BandoFTL(Controller):
         """
         assert self.env == this_vehicle.env, "Cannot mix environments."
         
-        # TEST #
-        if self.env.t <= 10.0:
-            return 1.0
-        else:
-            return 0.0 + self.env.random.normal()
+        # Get this vehicle's position and velocity:
+        #this_x = this_vehicle.pos.x
+        #this_v = this_vehicle.vel
+
+        # Get lead vehicle's position and velocity:
+        lead_vehicle = self.env.get_lead_vehicle(this_vehicle)
+        #lead_x = lead_vehicle.pos.x
+        #lead_v = lead_vehicle.vel
+
+        # Get different in position and velocity:
+        delta_x = this_vehicle.pos.distance_to(lead_vehicle.pos)
+        delta_v = lead_vehicle.vel - this_vehicle.vel
+
+        # Return commanded change in velocity:
+        control = self.a * self.ftl(delta_x, delta_v) + self.b * self.bando(delta_x)
+
+        return control
 
 
 class PID(Controller):
