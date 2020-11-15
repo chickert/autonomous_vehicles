@@ -105,7 +105,7 @@ class Position:
 
 class RingRoad:
 
-    def __init__(self, num_vehicles=22, ring_length=260.0, av_activate=60.0, seed=None):
+    def __init__(self, num_vehicles=22, ring_length=230.0, av_activate=60.0, temporal_res=0.1, seed=None):
         
         # Store properties:
         self.num_vehicles = num_vehicles  # Total number of vehicles (including A.V.).
@@ -114,7 +114,7 @@ class RingRoad:
         self.safe_distance = 4  # Safe distance between vehicles (meters).
         self.max_speed = 9.75  # Max velocity (meters/second).
         self.max_accel = 8.00  # Max acceleration (meters/second^2).
-        self.temporal_res = 0.1  # Time between updates (in seconds).
+        self.temporal_res = temporal_res  # Time between updates (in seconds).
         self.spatial_res = None
         self.traffic_a = 0.5  # Coefficient for the FTL model (meters/second).
         self.traffic_b = 20  # Coefficient for the Bando-OV model (1/second).
