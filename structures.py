@@ -105,18 +105,19 @@ class Position:
 
 class RingRoad:
 
-    def __init__(self, num_vehicles=22, ring_length=260.0, seed=None):
+    def __init__(self, num_vehicles=22, ring_length=260.0, av_activate=60.0, seed=None):
         
         # Store properties:
         self.num_vehicles = num_vehicles  # Total number of vehicles (including A.V.).
         self.ring_length = ring_length  # Length of ring road (meters).
         self.vehicle_length = 4.5  # Length of vehicles (meters).
         self.safe_distance = 4  # Safe distance between vehicles (meters).
-        self.max_speed = 9.75  # Max speed (meters/second).
+        self.max_speed = 9.75  # Max velocity (meters/second).
         self.temporal_res = 0.1  # Time between updates (in seconds).
         self.spatial_res = None
         self.traffic_a = 0.5  # Coefficient for the FTL model (meters/second).
         self.traffic_b = 20  # Coefficient for the Bando-OV model (1/second).
+        self.av_activate = av_activate  # When to activate AV controller (seconds).
         self.seed = seed
 
         # Store state information:
@@ -135,11 +136,17 @@ class RingRoad:
 
     @property
     def step(self):
-        return self.state['step']
+        try:
+            return self.state['step']
+        except:  # Before state initialization:
+            return 0
 
     @property
     def t(self):
-        return self.state['time']
+        try:
+            return self.state['time']
+        except:  # Before state initialization:
+            return 0.0
 
     @property
     def dt(self):
@@ -179,8 +186,9 @@ class RingRoad:
             init_acc = 0.0,
             length = self.vehicle_length,
         )
+        robot.max_vel = self.max_speed
         robot.state['index'] = 0
-        robot.active = False
+        robot.active = (self.av_activate==0)
         vehicles = [robot]
         for index in range(1,self.num_vehicles):
             human = Human(
@@ -191,6 +199,7 @@ class RingRoad:
                 init_acc = 0.0,
                 length = self.vehicle_length,
             )
+            human.max_vel = self.max_speed
             human.state['index'] = index
             vehicles.append(human)
         for vehicle in vehicles:
@@ -199,6 +208,7 @@ class RingRoad:
             'step' : 0,
             'time' : 0.0,
             'vehicles' : vehicles,  # List of vehicles in 0,...,(N-1) index order, with A.V. at index 0.
+            'av_active' : robot.active,
         }
 
     def copy_state(self):
@@ -239,6 +249,10 @@ class RingRoad:
         """Get a DataFrame of a acceleration for each vehicle (column) at each time step (row)."""
         return self.get_vehicle_state_table(key='acc', steps=steps)
 
+    def get_vehicle_control_table(self, steps=None):
+        """Get a DataFrame of a (unconstrained) control for each vehicle (column) at each time step (row)."""
+        return self.get_vehicle_state_table(key='control', steps=steps)
+
     def get_vehicle_index(self, vehicle):
         """
         Returns the index (or None) of a given Vehicle.
@@ -276,16 +290,19 @@ class RingRoad:
         """
 
         # Calcualte control for each vehicle:
-        control = dict()  # Keyed by index.
+        controls = dict()  # Keyed by index.
         for index,vehicle in enumerate(self.state['vehicles']):
-            control[index] = vehicle.controller.calculate(vehicle)
+            if (vehicle.type == 'robot') and (not vehicle.active) and (self.t >= self.av_activate):
+                vehicle.active = True
+            controls[index] = vehicle.controller.calculate(vehicle)
 
         # Apply control for each vehicle:
         for index,vehicle in enumerate(self.state['vehicles']):
             vehicle.state['index'] = index
             vehicle.state['step'] = self.state['step']
             vehicle.state['time'] = self.state['time']
-            vehicle.acc = control[index]
+            vehicle.state['control'] = controls[index]  # Unconstrainted command.
+            vehicle.acc = controls[index]  # Enforces kinematic constraints.
             vehicle.vel += vehicle.acc*self.dt
             vehicle.pos += vehicle.vel*self.dt
 
@@ -534,6 +551,12 @@ class RingRoad:
             # Plot:
             lines, = ax.plot(table['time'],table['vel'], color=color, alpha=alpha, zorder=zorder)
             artists.append(lines)
+
+        # Add line for AV activation:
+        y_min,y_max = ax.get_ylim()
+        if self.av_activate < self.t:
+            ax.plot([self.av_activate,self.av_activate],[y_min,y_max], color=av_color, alpha=1, zorder=5)
+        ax.set_ylim((y_min,y_max))
                 
         # Set axes:
         #ax.set_title("Velocity over time")
@@ -620,10 +643,13 @@ class Vehicle:
 
     def reset_state(self):
         self.state = {
+            'time' : self.env.t,
+            'step' : self.env.step,
             'index' : None,  # Set by environment.
             'pos' : Position(x=self.init_pos, L=self.env.L),
             'vel' : self.init_vel,
             'acc' : self.init_acc,
+            'control' : self.init_acc,
             'controller_type' : self.controller.type,
         }
 
@@ -632,12 +658,12 @@ class Vehicle:
 
     def archive_state(self):
         state = self.copy_state()
-        state['pos'] = state['pos'].x  # Extract position from Position object.
         state['time'] = self.env.t
         state['step'] = self.env.step
+        state['pos'] = state['pos'].x  # Extract position from Position object.
         self.history[self.env.step] = state
 
-    def get_state_table(self, keys=['step', 'time', 'index', 'pos', 'vel', 'acc'], steps=None):
+    def get_state_table(self, keys=['step', 'time', 'index', 'pos', 'vel', 'acc', 'control'], steps=None):
         """
         Build a DataFrame of the state history
         (with specified keys as columns and all available time steps as rows).

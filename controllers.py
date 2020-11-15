@@ -113,9 +113,9 @@ class PID(Controller):
         v_target = v_d + 1 * min(max(target, 0), 1)
         return v_target
 
-    def update_command_velocity(self, delta_x, velocity_history, lead_vehicle_velocity):
+    def update_command_velocity(self, delta_x, velocity_history, last_commanded_velocity, lead_vehicle_velocity):
         vj_target = self.calc_target_velocity(delta_x, velocity_history)
-        prior_uj = self.stored_command_velocity
+        prior_uj = last_commanded_velocity
         vj_lead = lead_vehicle_velocity
 
         alpha_j = self.calc_alpha(delta_x)
@@ -124,7 +124,6 @@ class PID(Controller):
         new_uj = beta_j * (alpha_j * vj_target + (1 - alpha_j) * vj_lead) + (1 - beta_j) * prior_uj
 
         updated_command_velocity = new_uj
-        self.stored_command_velocity = updated_command_velocity
         """
         NOTE [relevant to calc_desired_velocity() above]:
         Here I assume that the updated command velocity is equal to the actual vehicle velocity, but need to double-check
@@ -132,7 +131,6 @@ class PID(Controller):
         implementation of the commanded velocity
         (such as if actual velocity was a moving average of commanded velocities, for example)
         """
-        self.stored_velocities.append(self.stored_command_velocity)
         return updated_command_velocity
 
     def calculate(self, this_vehicle):
@@ -151,9 +149,11 @@ class PID(Controller):
         last_step = self.env.step
         state_history = this_vehicle.get_state_table(steps=range(first_step,last_step))
         velocity_history = np.array(state_history['pos'])
+        # Get command history (by adding last velocity to constrained control):
+        last_commanded_velocity = state_history['vel'].iloc[-1] + state_history['control'].iloc[-1]
 
         # Calculate command velocity and return control:
-        command_velocity = self.update_command_velocity(delta_x, velocity_history, lead_vehicle_velocity)
+        command_velocity = self.update_command_velocity(delta_x, velocity_history, last_commanded_velocity, lead_vehicle_velocity)
         current_velocity = this_vehicle.vel
         delta_velocity = command_velocity - current_velocity
 
