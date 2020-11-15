@@ -510,6 +510,12 @@ class RingRoad:
                     artists.append(lines)
                     prev_break = i
                 prev_row = this_row
+
+        # Add line for AV activation:
+        y_min,y_max = ax.get_ylim()
+        if self.av_activate < self.t:
+            ax.plot([self.av_activate,self.av_activate],[y_min,y_max], ls=':', color='black', alpha=1, zorder=5)
+        ax.set_ylim((y_min,y_max))
                 
         # Set axes:
         #ax.set_title("Position over time")
@@ -555,7 +561,7 @@ class RingRoad:
         # Add line for AV activation:
         y_min,y_max = ax.get_ylim()
         if self.av_activate < self.t:
-            ax.plot([self.av_activate,self.av_activate],[y_min,y_max], color=av_color, alpha=1, zorder=5)
+            ax.plot([self.av_activate,self.av_activate],[y_min,y_max], ls=':', color='black', alpha=1, zorder=5)
         ax.set_ylim((y_min,y_max))
                 
         # Set axes:
