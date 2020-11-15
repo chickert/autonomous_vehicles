@@ -5,6 +5,8 @@ Data structures for simulation of autonomous vehicle controllers presented by De
 https://doi.org/10.1007/978-3-030-25446-9_12
 """
 
+import warnings
+
 import numpy as np
 import pandas as pd
 
@@ -26,7 +28,7 @@ class Position:
         Positions are always positive, as stored as a float in the interval [ 0.0, L ).
         """
         if hasattr(x, 'env'): # Check if the input is alread a Vehicle.
-            assert L == x.env.length, "Cannot mix positions with different L values."
+            assert L == x.env.ring_length, "Cannot mix positions with different L values."
             x = x.x
         elif hasattr(x, 'L'): # Check if the input is a Position.
             assert L == x.L, "Cannot mix positions with different L values."
@@ -104,20 +106,23 @@ class Position:
 
 class RingRoad:
 
-    def __init__(self, num_vehicles=22, ring_length=230.0, av_activate=60.0, temporal_res=0.1, seed=None):
+    def __init__(self, num_vehicles=22, ring_length=230.0, starting_noise=0.5, av_activate=60.0, temporal_res=0.1, seed=None):
         
         # Store properties:
         self.num_vehicles = num_vehicles  # Total number of vehicles (including A.V.).
         self.ring_length = ring_length  # Length of ring road (meters).
         self.vehicle_length = 4.5  # Length of vehicles (meters).
-        self.safe_distance = 4  # Safe distance between vehicles (meters).
+        self.safe_distance = 4.0  # Safe distance between vehicles (meters).
+        self.min_speed = 0.00  # Min velocity (meters/second).
         self.max_speed = 9.75  # Max velocity (meters/second).
+        self.min_accel = -4.6  # Min acceleration (meters/second^2).
         self.max_accel = 8.00  # Max acceleration (meters/second^2).
         self.temporal_res = temporal_res  # Time between updates (in seconds).
         self.spatial_res = None
         self.traffic_a = 0.5  # Coefficient for the FTL model (meters/second).
         self.traffic_b = 20  # Coefficient for the Bando-OV model (1/second).
         self.av_activate = av_activate  # When to activate AV controller (seconds).
+        self.starting_noise = starting_noise  # Add noise (in meters) to starting positions.
         self.seed = seed
 
         # Store state information:
@@ -190,10 +195,12 @@ class RingRoad:
         robot.active = (self.av_activate==0)
         vehicles = [robot]
         for index in range(1,self.num_vehicles):
+            noise = self.starting_noise
+            noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
             human = Human(
                 env=self,
                 controller = BandoFTL(env=self, a=self.traffic_a, b=self.traffic_b),
-                init_pos = index * d_start,
+                init_pos = index * d_start + noise,
                 init_vel = 0.0,
                 init_acc = 0.0,
                 length = self.vehicle_length,
@@ -202,10 +209,11 @@ class RingRoad:
             vehicles.append(human)
         for vehicle in vehicles:
             # Adjust kinematics:
-            vehicle.min_vel - 0.0  # No reverse.
+            vehicle.min_vel = self.min_speed
             vehicle.max_vel = self.max_speed
-            vehicle.min_acc = self.max_accel * -1
-            vehicle.max_acc = self.max_accel
+            vehicle.min_acc = self.min_accel
+            vehicle.max_acc = self.max_accel# + np.round(self.random.uniform(-0.25,0.25),2)
+            vehicle.min_acc =  - vehicle.max_acc
             # Add vehicle:
             self.all_vehicles.add(vehicle)
         self.state = {
@@ -288,6 +296,37 @@ class RingRoad:
         lead_vehicle = self.state['vehicles'][lead_index]
         return lead_vehicle
 
+    def check(self):
+        """
+        Makes sure no vehicles have passed another or gotten too close.
+        """
+
+        # Sort vehicles in order of position:
+        vehicles = sorted(self.vehicles, key=lambda vehicle: vehicle.pos.x)
+        # Reverse list order to match index order (most advanced )
+        vehicles = vehicles[::-1]
+
+        # Loop through vehicles to check that they are also in index order:
+        lead_vehicle = vehicles[-1]
+        lead_index = self.get_vehicle_index(lead_vehicle)
+        for this_vehicle in vehicles:
+            this_index = self.get_vehicle_index(this_vehicle)
+            if (this_index+1) % self.N != lead_index:
+                raise RuntimeError("Illegal passing occured at step={} around index {} : {}".format(
+                    self.step,
+                    this_index,
+                    this_vehicle, #this_vehicle.__repr__(),
+                ))
+            # Check safety distance:
+            if this_vehicle.distance_to(lead_vehicle) - lead_vehicle.length < self.safe_distance:
+                warning = "WARNING: Safe distance violation at step {}:".format(self.step)
+                warning += "  [{}] {}".format(this_index,this_vehicle)
+                warning += "  [{}] {}".format(lead_index,lead_vehicle)
+                warnings.warn(warning)
+            # Store values for next iteration:
+            lead_vehicle = this_vehicle
+            lead_index = this_index
+
     def run_step(self):
         """
         Perform simulation update for one time step.
@@ -309,6 +348,9 @@ class RingRoad:
             vehicle.acc = controls[index]  # Enforces kinematic constraints.
             vehicle.vel += vehicle.acc*self.dt
             vehicle.pos += vehicle.vel*self.dt
+
+        # Make sure there has been no illegal passing or tailgaiting.
+        self.check()
 
         # Increment time step for next iteration:
         self.state['step'] += 1
@@ -687,6 +729,15 @@ class Vehicle:
             table.append( {key : state[key] for key in keys if key in state.keys()} )
         table = pd.DataFrame(table, columns=keys, index=steps)
         return table
+
+    def distance_to(self, other):
+        """
+        Return the distance from self to other (i.e. by how much does other lead self?)
+        If reverse=True, returns the distance from other to self, travelling in direction of the road.
+        Distances are always positive and are measured in the direction of traffic.
+        """
+        other = Position(other, self.env.L)  # Convert to position.
+        return self.pos.distance_to(other)  # Call Position.distance_to(Position) .
 
 class Human(Vehicle):
 
