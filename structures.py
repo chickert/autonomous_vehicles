@@ -8,7 +8,6 @@ https://doi.org/10.1007/978-3-030-25446-9_12
 import numpy as np
 import pandas as pd
 
-import plotly.io
 import matplotlib.animation
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
