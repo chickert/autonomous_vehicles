@@ -39,12 +39,13 @@ class BandoFTL(Controller):
         C = self.C
         return C * delta_v / delta_x
 
-    def bando(self, delta_x):
+    def bando(self, delta_x, this_v):
         d = delta_x
         v_max = self.env.max_speed
         l_v = self.env.vehicle_length
         d_s = self.env.safe_distance
-        return v_max * ( np.tanh(d-l_v-d_s) + np.tanh(l_v+d_s)) / ( 1 + np.tanh(l_v+d_s))
+        optimal_velocity = v_max * ( np.tanh(d-l_v-d_s) + np.tanh(l_v+d_s)) / ( 1.0 + np.tanh(l_v+d_s))
+        return optimal_velocity - this_v
 
     def calculate(self, this_vehicle):
         """
@@ -54,19 +55,19 @@ class BandoFTL(Controller):
         
         # Get this vehicle's position and velocity:
         #this_x = this_vehicle.pos.x
-        #this_v = this_vehicle.vel
+        this_v = this_vehicle.vel
 
         # Get lead vehicle's position and velocity:
         lead_vehicle = self.env.get_lead_vehicle(this_vehicle)
         #lead_x = lead_vehicle.pos.x
-        #lead_v = lead_vehicle.vel
+        lead_v = lead_vehicle.vel
 
         # Get different in position and velocity:
         delta_x = this_vehicle.pos.distance_to(lead_vehicle.pos)
-        delta_v = lead_vehicle.vel - this_vehicle.vel
+        delta_v = lead_v - this_v
 
         # Return commanded change in velocity:
-        control = self.a * self.ftl(delta_x, delta_v) + self.b * self.bando(delta_x)
+        control = self.a * self.ftl(delta_x, delta_v) + self.b * self.bando(delta_x, this_v)
 
         return control
 
