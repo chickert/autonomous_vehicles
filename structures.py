@@ -113,6 +113,7 @@ class RingRoad:
         self.vehicle_length = 4.5  # Length of vehicles (meters).
         self.safe_distance = 4  # Safe distance between vehicles (meters).
         self.max_speed = 9.75  # Max velocity (meters/second).
+        self.max_accel = 8.00  # Max acceleration (meters/second^2).
         self.temporal_res = 0.1  # Time between updates (in seconds).
         self.spatial_res = None
         self.traffic_a = 0.5  # Coefficient for the FTL model (meters/second).
@@ -186,7 +187,6 @@ class RingRoad:
             init_acc = 0.0,
             length = self.vehicle_length,
         )
-        robot.max_vel = self.max_speed
         robot.state['index'] = 0
         robot.active = (self.av_activate==0)
         vehicles = [robot]
@@ -199,10 +199,15 @@ class RingRoad:
                 init_acc = 0.0,
                 length = self.vehicle_length,
             )
-            human.max_vel = self.max_speed
             human.state['index'] = index
             vehicles.append(human)
         for vehicle in vehicles:
+            # Adjust kinematics:
+            vehicle.min_vel - 0.0  # No reverse.
+            vehicle.max_vel = self.max_speed
+            vehicle.min_acc = self.max_accel * -1
+            vehicle.max_acc = self.max_accel
+            # Add vehicle:
             self.all_vehicles.add(vehicle)
         self.state = {
             'step' : 0,
