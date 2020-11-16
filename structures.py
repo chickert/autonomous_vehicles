@@ -362,11 +362,15 @@ class RingRoad:
         for s in range(steps):
             self.run_step()
 
-    def start_animation(self, fig, ax):
+    def start_animation(self, fig, axs):
         self._animation = {
             'fig' : fig,
-            'ax' : ax,
         }
+        try:
+            axs[0]  # For single ax.
+        except:
+            axs = tuple([axs])
+        self._animation['axs'] = axs
         plt.ion()
         plt.show(block=False)
 
@@ -375,7 +379,7 @@ class RingRoad:
         plt.ioff()
         plt.close()
 
-    def visualize(self, step=None, draw_cars_to_scale=False, draw_safety_buffer=False, label_step=True, label_cars=True):
+    def visualize(self, step=None, draw_cars_to_scale=False, draw_safety_buffer=False, label_step=True, label_cars=True, ax=None):
 
         # Plot latest step by default:
         if step is None:
@@ -395,7 +399,9 @@ class RingRoad:
         # Create plot (or get current axes if animating):
         if not hasattr(self, '_animation'):
             self._animation = None
-        if self._animation:
+        if ax is not None:
+            fig = ax.figure
+        elif self._animation:
             fig = self._animation['fig']
             ax = self._animation['ax']
             ax.clear()
@@ -488,9 +494,10 @@ class RingRoad:
         else:
             return fig, ax
 
-    def plot_positions(self):
+    def plot_positions(self, steps=None, ax=None):
         """
-        Plot positions of vehicles (y axis) over time (x axis):
+        Plot positions of vehicles (y axis) over time (x axis).
+        Optionally, specify step with an iterable (for animation).
         """
         
         # Set plotting options:
@@ -499,8 +506,10 @@ class RingRoad:
         
         # Create plot (or get current axes if animating):
         if not hasattr(self, '_animation'):
-            self._animation = None
-        if self._animation:
+            self._animation = None        
+        if ax is not None:
+            fig = ax.figure
+        elif self._animation:
             fig = self._animation['fig']
             ax = self._animation['ax']
             ax.clear()
@@ -509,11 +518,15 @@ class RingRoad:
 
         # Collect artists (for pyplot animation):
         artists = []
+
+        # Get steps to plot:
+        if steps is None:
+            steps = range(0,self.step)
         
         # Plot each vehicle:
         for vehicle in self.all_vehicles:
             # Get a table of state history for this vehicle:
-            table = vehicle.get_state_table(keys=['step','time','pos'])
+            table = vehicle.get_state_table(keys=['step','time','pos'], steps=steps)
             # Set plotting options:
             if vehicle.type=='human':
                 color = hv_color
@@ -548,7 +561,7 @@ class RingRoad:
                 prev_row = this_row
 
         # Add line for AV activation:
-        y_min,y_max = ax.get_ylim()
+        y_min,y_max = 0, self.L
         if self.av_activate < self.t:
             ax.plot([self.av_activate,self.av_activate],[y_min,y_max], ls=':', color='black', alpha=1, zorder=5)
         ax.set_ylim((y_min,y_max))
@@ -564,9 +577,10 @@ class RingRoad:
         else:
             return fig, ax
 
-    def plot_velocities(self):
+    def plot_velocities(self, steps=None, show_sigma=False, ax=None):
         """
-        Plot velocities of vehicles (y axis) over time (x axis):
+        Plot velocities of vehicles (y axis) over time (x axis).
+        Optionally, specify step with an iterable (for animation).
         """
         
         # Set plotting options:
@@ -576,7 +590,9 @@ class RingRoad:
         # Create plot (or get current axes if animating):
         if not hasattr(self, '_animation'):
             self._animation = None
-        if self._animation:
+        if ax is not None:
+            fig = ax.figure
+        elif self._animation:
             fig = self._animation['fig']
             ax = self._animation['ax']
             ax.clear()
@@ -585,11 +601,15 @@ class RingRoad:
 
         # Collect artists (for pyplot animation):
         artists = []
+
+        # Get steps to plot:
+        if steps is None:
+            steps = range(0,self.step)
         
         # Plot each vehicle:
         for vehicle in self.all_vehicles:
             # Get a table of state history for this vehicle:
-            table = vehicle.get_state_table(keys=['step','time','vel'])
+            table = vehicle.get_state_table(keys=['step','time','vel'], steps=steps)
             # Set plotting options:
             if vehicle.type=='human':
                 color = hv_color
@@ -605,8 +625,15 @@ class RingRoad:
             lines, = ax.plot(table['time'],table['vel'], color=color, alpha=alpha, zorder=zorder)
             artists.append(lines)
 
+        # Plot standard deviation across vehicles:
+        if show_sigma:
+            table = self.get_vehicle_vel_table(steps=steps).std(axis=1).to_frame(name='sigma').reset_index()
+            ax.plot(table['time'], table['sigma'], lw=1, color='grey', label="Standard deviation\nacross all vehicles")
+            ax.legend(loc='center right', fontsize=6)
+
         # Add line for AV activation:
-        y_min,y_max = ax.get_ylim()
+        #y_min,y_max = ax.get_ylim()
+        y_min,y_max = 0, min(30,self.max_speed)*1.05
         if self.av_activate < self.t:
             ax.plot([self.av_activate,self.av_activate],[y_min,y_max], ls=':', color='black', alpha=1, zorder=5)
         ax.set_ylim((y_min,y_max))
@@ -621,6 +648,56 @@ class RingRoad:
             return tuple(artists)
         else:
             return fig, ax
+
+    def plot_dashboad(self, step=None, total_steps=None, **plot_options):
+        """
+        Plot a combination of plots for a specific step.
+        """
+
+        # Create plot (or get current axes if animating):
+        if not hasattr(self, '_animation'):
+            self._animation = None
+        if self._animation:
+            fig = self._animation['fig']
+            axs = self._animation['axs']
+            ax1,ax2,ax3 = axs
+            for ax in axs:
+                ax.clear()
+        else:
+            fig = plt.figure(figsize=(16,6))
+            ax1 = fig.add_subplot(1, 2, 1, facecolor='white', frameon=False, projection='polar')
+            ax2 = fig.add_subplot(2, 2, 2, facecolor='white')
+            ax3 = fig.add_subplot(2, 2, 4, facecolor='white')
+        
+        if step is None:
+            step = self.step
+
+        # Parse options:
+        ax1_options = dict()
+        ax2_options = dict()
+        ax3_options = dict()
+        for k,v in plot_options.items():
+            if k in {'draw_cars_to_scale','draw_safety_buffer','label_cars','label_step'}:
+                ax1_options[k] = v
+            if k in {}:
+                ax2_options[k] = v
+            if k in {'show_sigma'}:
+                ax3_options[k] = v
+
+        artists = []  # Collect arists for animation.
+        artists.extend( self.visualize(ax=ax1, step=step, **ax1_options) )
+        artists.extend( self.plot_positions(ax=ax2, steps=range(0,step), **ax2_options) )
+        artists.extend( self.plot_velocities(ax=ax3, steps=range(0,step), **ax3_options) )
+        
+        if total_steps is not None:
+            ax2.set_xlim(0,total_steps*self.dt)
+            ax3.set_xlim(0,total_steps*self.dt)
+
+        # Return artists or figure:
+        if self._animation:
+            return tuple(artists)
+        else:
+            return fig, (ax1,ax2,ax3)
 
 class Vehicle:
 

@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pandas as pd
 
@@ -112,7 +114,7 @@ class PID(Controller):
         """
         Currently unclear on how to calc this
         """
-        print("TODO: Calculate beta.")
+        warnings.warn("TODO: Calculate beta.")
         return 1.0  # Arbitrary test value.
 
     def calc_desired_velocity(self, velocity_history):
