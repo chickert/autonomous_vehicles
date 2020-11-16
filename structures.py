@@ -115,8 +115,8 @@ class RingRoad:
         self.safe_distance = 4.0  # Safe distance between vehicles (meters).
         self.min_speed = 0.00  # Min velocity (meters/second).
         self.max_speed = 9.75  # Max velocity (meters/second).
-        self.min_accel = -4.6  # Min acceleration (meters/second^2).
-        self.max_accel = 8.00  # Max acceleration (meters/second^2).
+        self.min_accel = -7  # Min acceleration (meters/second^2).
+        self.max_accel = 6.50  # Max acceleration (meters/second^2).
         self.temporal_res = temporal_res  # Time between updates (in seconds).
         self.spatial_res = None
         self.traffic_a = 0.5  # Coefficient for the FTL model (meters/second).
