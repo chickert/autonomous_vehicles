@@ -461,12 +461,16 @@ class RingRoad:
 
             # Add text:
             if label_cars:
-                label = ax.text(car_theta, (road_radius+road_width*1.25), "{}".format(car_state['index']), fontsize=10, ha='center', va='center')
+                car_label = "{}".format(car_state['index'])
+                label = ax.text(car_theta, (road_radius+road_width*1.25), car_label, fontsize=10, ha='center', va='center')
                 artists.append(label)
 
         # Add text:
         if label_step:
-            label = ax.text(0,0, "t = {:.1f} s".format(state['time']), fontsize=14, ha='center', va='center')
+            step_label = "t = {:.1f} s".format(state['time'])
+            if label_cars:
+                step_label = " \n\n"+step_label+"\n\n"+"A.V. = 0"
+            label = ax.text(0,0, step_label, fontsize=14, ha='center', va='center')
             artists.append(label)
         
         # Hide ticks and gridlines:
