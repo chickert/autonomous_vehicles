@@ -301,16 +301,15 @@ class RingRoad:
         Makes sure no vehicles have passed another or gotten too close.
         """
 
-        # Sort vehicles in order of position:
+        # Sort vehicles in order of actual position (regardless of index):
         vehicles = sorted(self.vehicles, key=lambda vehicle: vehicle.pos.x)
-        # Reverse list order to match index order (most advanced )
-        vehicles = vehicles[::-1]
 
         # Loop through vehicles to check that they are also in index order:
-        lead_vehicle = vehicles[-1]
-        lead_index = self.get_vehicle_index(lead_vehicle)
-        for this_vehicle in vehicles:
+        for j in range(len(vehicles)):
+            this_vehicle = vehicles[j]
+            lead_vehicle = vehicles[(j+1)%self.N]
             this_index = self.get_vehicle_index(this_vehicle)
+            lead_index = self.get_vehicle_index(lead_vehicle)
             if (this_index+1) % self.N != lead_index:
                 raise RuntimeError("Illegal passing occured at step={} around index {} : {}".format(
                     self.step,
