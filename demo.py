@@ -7,8 +7,10 @@ import matplotlib.pyplot as plt
 
 from structures import *
 
+# Hide warnings about safe distance violation (still in development):
 warnings.filterwarnings("ignore", category=UserWarning)
 
+# Define a ring road environment:
 env = RingRoad(
     num_vehicles = 22,
     ring_length = 230.0,
@@ -17,10 +19,13 @@ env = RingRoad(
     av_activate = 30,
     seed = 286,
 )
-total_steps = int(np.ceil(50/env.dt))
+
+# Run the simulation for set number of time steps:
+total_time = 50  # In seconds.
+total_steps = int(np.ceil(total_time/env.dt))
 env.run(steps=total_steps)
 
-# Show animation:
+# Show animation (runs for about a minute, in an interactive pyplot window):
 speedup = 100.0  # Speed up animation relative to real time (not accounting for time it takes to draw plots).
 interval = 1  # Only plot every n-th frame.
 fig = plt.figure(figsize=(16,6))
