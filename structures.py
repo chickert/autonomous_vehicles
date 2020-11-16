@@ -362,7 +362,20 @@ class RingRoad:
         for s in range(steps):
             self.run_step()
 
-    def visualize(self, step=None, draw_cars_to_scale=False, label_step=True, label_cars=True):
+    def start_animation(self, fig, ax):
+        self._animation = {
+            'fig' : fig,
+            'ax' : ax,
+        }
+        plt.ion()
+        plt.show(block=False)
+
+    def stop_animation(self):
+        self._animation = None
+        plt.ioff()
+        plt.close()
+
+    def visualize(self, step=None, draw_cars_to_scale=False, draw_safety_buffer=False, label_step=True, label_cars=True):
 
         # Plot latest step by default:
         if step is None:
@@ -372,9 +385,9 @@ class RingRoad:
         state = self.history[step]
 
         # Set plotting options:
-        road_width = 20.
-        scaled_car_width = 10.
-        point_car_size = 8.
+        road_width = 6.
+        car_width = 3.
+        point_car_size = 6.
         road_color = 'silver'
         hv_color = 'firebrick'
         av_color = 'seagreen'
@@ -398,9 +411,11 @@ class RingRoad:
         
         # Plot a circle: https://stackoverflow.com/a/19828753
         polar_transform = ax.transProjectionAffine + ax.transAxes
-        ring_road = plt.Circle((0, 0), road_radius, color=road_color, zorder=1, lw=road_width, fill=False, transform=polar_transform)
+        #ring_road = plt.Circle((0, 0), road_radius, color=road_color, zorder=1, lw=road_width, fill=False, transform=polar_transform)
+        ring_road = plt.Rectangle(xy=(0, road_radius-road_width/2), width=2*np.pi, height=road_width, lw=0, color=road_color, zorder=1, fill=True)
         ax.add_artist(ring_road)
         artists.append(ring_road)
+        ax.bar(0, 1).remove()  # Hack: https://github.com/matplotlib/matplotlib/issues/8521#issue-223234274
 
         # Now plot the cars after transforming the 1-dimensional location of each to the polar coordinate system
         for car in state['vehicles']:
@@ -409,11 +424,6 @@ class RingRoad:
             car_state = car.get_state_table(keys=['index','pos'], steps=[step])
             car_state = car_state.iloc[0].to_dict()  # Convert the single table row to a dictionary.
             car_state['index'] = int(car_state['index'])  # Make sure index is an integer.
-
-            # Transform the 1-D coord to polar system
-            normalized_pos = car_state['pos'] / self.ring_length
-            car_theta = normalized_pos * (2 * np.pi)
-
             if car.type=='human':
                 car_color = hv_color
                 car_zorder = 2
@@ -423,26 +433,35 @@ class RingRoad:
             else:
                 raise NotImplementedError
 
+            # Transform the 1-D coord to polar system
+            car_theta = (2*np.pi) * car_state['pos'] / self.ring_length
+
             # Now plot the cars, whether to scale or not, with color according to whether each is an AV or human driver
             # Note: for large ring roads, it is likely better to NOT draw to scale, for easier visualization
             if draw_cars_to_scale:
-                normalized_car_length = car.length / self.ring_length
-                polar_car_length = normalized_car_length * (2 * np.pi)
-                car_arc_theta = np.arange(start=car_theta - polar_car_length/2,
-                                    stop=car_theta + polar_car_length/2,
-                                    step=0.005)
-                car_arc_radius = np.repeat(road_radius, len(car_arc_theta))
                 
-                car_arc = ax.plot(car_arc_theta, car_arc_radius, color=car_color, zorder=car_zorder, lw=scaled_car_width)
-                artists.append(car_arc)
+                # Draw car:
+                car_polar_length = (2*np.pi) * car.length / self.ring_length
+                car_rectangle = plt.Rectangle(xy=(car_theta-car_polar_length, road_radius-car_width/2), width=car_polar_length, height=car_width, lw=0, color=car_color, zorder=car_zorder, fill=True)
+                ax.add_artist(car_rectangle)
+                artists.append(car_rectangle)
+                
+                # Draw safety zone behind car:
+                if draw_safety_buffer:
+                    car_polar_buffer = (2*np.pi) * self.safe_distance / self.ring_length
+                    car_buffer = plt.Rectangle(xy=(car_theta-car_polar_length-car_polar_buffer, road_radius-car_width/2), width=car_polar_buffer, height=car_width, lw=0, color='gold', zorder=car_zorder-0.1, alpha=0.4, fill=True)
+                    ax.add_artist(car_buffer)
+                    artists.append(car_buffer)
 
             else:
-                car_point, = ax.plot(car_theta, road_radius, color=car_color, zorder=car_zorder, marker='s', markersize=point_car_size)
+
+                # Draw car:
+                car_point, = ax.plot(car_theta, road_radius, color=car_color, zorder=car_zorder, marker='o', markersize=point_car_size)
                 artists.append(car_point)
 
             # Add text:
             if label_cars:
-                label = ax.text(car_theta, road_radius*1.15, "{}".format(car_state['index']), fontsize=10, ha='center', va='center')
+                label = ax.text(car_theta, (road_radius+road_width*1.25), "{}".format(car_state['index']), fontsize=10, ha='center', va='center')
                 artists.append(label)
 
         # Add text:
@@ -457,52 +476,13 @@ class RingRoad:
         ax.grid(False)
 
         ax.set_xlim((0,np.pi*2))
-        ax.set_ylim((0,road_radius*1.05))
+        ax.set_ylim((0,(road_radius+road_width/2)*1.05))
         
         # Return artists or figure:
         if self._animation:
             return tuple(artists)
         else:
             return fig, ax
-
-    def animate(self, steps=None, *args, **kwargs):
-        """
-        Plot the history of the simulation (optionally specifying steps as an iterable).
-        (Takes same options as `visualize` function).
-        """
-        
-        # Create workspace for animation:
-        self._animation = dict()
-
-        # Get start and end steps:
-        if steps is None:
-            steps = range(self.step+1)
-
-        # Define plot update function:
-        def func(frame):
-            return self.visualize(step=frame, *args, **kwargs)
-        def init_func():
-            return self.visualize(step=0, *args, **kwargs)
-
-        # Build animation:
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='polar')
-        self._animation['fig'] = fig
-        self._animation['ax'] = ax
-        anim = matplotlib.animation.FuncAnimation(
-            fig,
-            func,
-            frames=steps,
-            #init_func=init_func,
-            interval=200,
-            blit=True,
-            repeat=False,
-        )
-
-        # Clear workspace:
-        self._animation = None
-
-        return anim
 
     def plot_positions(self):
         """
@@ -513,8 +493,15 @@ class RingRoad:
         hv_color = 'firebrick'
         av_color = 'seagreen'
         
-        # Create plot:
-        fig,ax = plt.subplots(1,1, figsize=(16,4))
+        # Create plot (or get current axes if animating):
+        if not hasattr(self, '_animation'):
+            self._animation = None
+        if self._animation:
+            fig = self._animation['fig']
+            ax = self._animation['ax']
+            ax.clear()
+        else:
+            fig,ax = plt.subplots(1,1, figsize=(16,4))
 
         # Collect artists (for pyplot animation):
         artists = []
@@ -567,7 +554,11 @@ class RingRoad:
         ax.set_xlabel("time (seconds)")
         ax.set_ylabel("position (meters)")
         
-        return fig, ax
+        # Return artists or figure:
+        if self._animation:
+            return tuple(artists)
+        else:
+            return fig, ax
 
     def plot_velocities(self):
         """
@@ -578,8 +569,15 @@ class RingRoad:
         hv_color = 'firebrick'
         av_color = 'seagreen'
         
-        # Create plot:
-        fig,ax = plt.subplots(1,1, figsize=(16,4))
+        # Create plot (or get current axes if animating):
+        if not hasattr(self, '_animation'):
+            self._animation = None
+        if self._animation:
+            fig = self._animation['fig']
+            ax = self._animation['ax']
+            ax.clear()
+        else:
+            fig,ax = plt.subplots(1,1, figsize=(16,4))
 
         # Collect artists (for pyplot animation):
         artists = []
@@ -614,7 +612,11 @@ class RingRoad:
         ax.set_xlabel("time (seconds)")
         ax.set_ylabel("velocity (meters/second)")
         
-        return fig, ax
+        # Return artists or figure:
+        if self._animation:
+            return tuple(artists)
+        else:
+            return fig, ax
 
 class Vehicle:
 
