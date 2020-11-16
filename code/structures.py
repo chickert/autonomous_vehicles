@@ -115,8 +115,8 @@ class RingRoad:
         self.safe_distance = 4.0  # Safe distance between vehicles (meters).
         self.min_speed = 0.00  # Min velocity (meters/second).
         self.max_speed = 9.75  # Max velocity (meters/second).
-        self.min_accel = -4.6  # Min acceleration (meters/second^2).
-        self.max_accel = 8.00  # Max acceleration (meters/second^2).
+        self.min_accel = -7  # Min acceleration (meters/second^2).
+        self.max_accel = 6.50  # Max acceleration (meters/second^2).
         self.temporal_res = temporal_res  # Time between updates (in seconds).
         self.spatial_res = None
         self.traffic_a = 0.5  # Coefficient for the FTL model (meters/second).
@@ -362,7 +362,24 @@ class RingRoad:
         for s in range(steps):
             self.run_step()
 
-    def visualize(self, step=None, draw_cars_to_scale=False, label_step=True, label_cars=True):
+    def start_animation(self, fig, axs):
+        self._animation = {
+            'fig' : fig,
+        }
+        try:
+            axs[0]  # For single ax.
+        except:
+            axs = tuple([axs])
+        self._animation['axs'] = axs
+        plt.ion()
+        plt.show(block=False)
+
+    def stop_animation(self):
+        self._animation = None
+        plt.ioff()
+        plt.close()
+
+    def visualize(self, step=None, draw_cars_to_scale=False, draw_safety_buffer=False, label_step=True, label_cars=True, ax=None):
 
         # Plot latest step by default:
         if step is None:
@@ -372,9 +389,9 @@ class RingRoad:
         state = self.history[step]
 
         # Set plotting options:
-        road_width = 20.
-        scaled_car_width = 10.
-        point_car_size = 8.
+        road_width = 6.
+        car_width = 3.
+        point_car_size = 6.
         road_color = 'silver'
         hv_color = 'firebrick'
         av_color = 'seagreen'
@@ -382,7 +399,9 @@ class RingRoad:
         # Create plot (or get current axes if animating):
         if not hasattr(self, '_animation'):
             self._animation = None
-        if self._animation:
+        if ax is not None:
+            fig = ax.figure
+        elif self._animation:
             fig = self._animation['fig']
             ax = self._animation['ax']
             ax.clear()
@@ -398,9 +417,11 @@ class RingRoad:
         
         # Plot a circle: https://stackoverflow.com/a/19828753
         polar_transform = ax.transProjectionAffine + ax.transAxes
-        ring_road = plt.Circle((0, 0), road_radius, color=road_color, zorder=1, lw=road_width, fill=False, transform=polar_transform)
+        #ring_road = plt.Circle((0, 0), road_radius, color=road_color, zorder=1, lw=road_width, fill=False, transform=polar_transform)
+        ring_road = plt.Rectangle(xy=(0, road_radius-road_width/2), width=2*np.pi, height=road_width, lw=0, color=road_color, zorder=1, fill=True)
         ax.add_artist(ring_road)
         artists.append(ring_road)
+        ax.bar(0, 1).remove()  # Hack: https://github.com/matplotlib/matplotlib/issues/8521#issue-223234274
 
         # Now plot the cars after transforming the 1-dimensional location of each to the polar coordinate system
         for car in state['vehicles']:
@@ -409,11 +430,6 @@ class RingRoad:
             car_state = car.get_state_table(keys=['index','pos'], steps=[step])
             car_state = car_state.iloc[0].to_dict()  # Convert the single table row to a dictionary.
             car_state['index'] = int(car_state['index'])  # Make sure index is an integer.
-
-            # Transform the 1-D coord to polar system
-            normalized_pos = car_state['pos'] / self.ring_length
-            car_theta = normalized_pos * (2 * np.pi)
-
             if car.type=='human':
                 car_color = hv_color
                 car_zorder = 2
@@ -423,31 +439,44 @@ class RingRoad:
             else:
                 raise NotImplementedError
 
+            # Transform the 1-D coord to polar system
+            car_theta = (2*np.pi) * car_state['pos'] / self.ring_length
+
             # Now plot the cars, whether to scale or not, with color according to whether each is an AV or human driver
             # Note: for large ring roads, it is likely better to NOT draw to scale, for easier visualization
             if draw_cars_to_scale:
-                normalized_car_length = car.length / self.ring_length
-                polar_car_length = normalized_car_length * (2 * np.pi)
-                car_arc_theta = np.arange(start=car_theta - polar_car_length/2,
-                                    stop=car_theta + polar_car_length/2,
-                                    step=0.005)
-                car_arc_radius = np.repeat(road_radius, len(car_arc_theta))
                 
-                car_arc = ax.plot(car_arc_theta, car_arc_radius, color=car_color, zorder=car_zorder, lw=scaled_car_width)
-                artists.append(car_arc)
+                # Draw car:
+                car_polar_length = (2*np.pi) * car.length / self.ring_length
+                car_rectangle = plt.Rectangle(xy=(car_theta-car_polar_length, road_radius-car_width/2), width=car_polar_length, height=car_width, lw=0, color=car_color, zorder=car_zorder, fill=True)
+                ax.add_artist(car_rectangle)
+                artists.append(car_rectangle)
+                
+                # Draw safety zone behind car:
+                if draw_safety_buffer:
+                    car_polar_buffer = (2*np.pi) * self.safe_distance / self.ring_length
+                    car_buffer = plt.Rectangle(xy=(car_theta-car_polar_length-car_polar_buffer, road_radius-car_width/2), width=car_polar_buffer, height=car_width, lw=0, color='gold', zorder=car_zorder-0.1, alpha=0.4, fill=True)
+                    ax.add_artist(car_buffer)
+                    artists.append(car_buffer)
 
             else:
-                car_point, = ax.plot(car_theta, road_radius, color=car_color, zorder=car_zorder, marker='s', markersize=point_car_size)
+
+                # Draw car:
+                car_point, = ax.plot(car_theta, road_radius, color=car_color, zorder=car_zorder, marker='o', markersize=point_car_size)
                 artists.append(car_point)
 
             # Add text:
             if label_cars:
-                label = ax.text(car_theta, road_radius*1.15, "{}".format(car_state['index']), fontsize=10, ha='center', va='center')
+                car_label = "{}".format(car_state['index'])
+                label = ax.text(car_theta, (road_radius+road_width*1.25), car_label, fontsize=10, ha='center', va='center')
                 artists.append(label)
 
         # Add text:
         if label_step:
-            label = ax.text(0,0, "t = {:.1f} s".format(state['time']), fontsize=14, ha='center', va='center')
+            step_label = "t = {:.1f} s".format(state['time'])
+            if label_cars:
+                step_label = " \n\n"+step_label+"\n\n"+"A.V. = 0"
+            label = ax.text(0,0, step_label, fontsize=14, ha='center', va='center')
             artists.append(label)
         
         # Hide ticks and gridlines:
@@ -457,7 +486,7 @@ class RingRoad:
         ax.grid(False)
 
         ax.set_xlim((0,np.pi*2))
-        ax.set_ylim((0,road_radius*1.05))
+        ax.set_ylim((0,(road_radius+road_width/2)*1.05))
         
         # Return artists or figure:
         if self._animation:
@@ -465,64 +494,39 @@ class RingRoad:
         else:
             return fig, ax
 
-    def animate(self, steps=None, *args, **kwargs):
+    def plot_positions(self, steps=None, ax=None):
         """
-        Plot the history of the simulation (optionally specifying steps as an iterable).
-        (Takes same options as `visualize` function).
-        """
-        
-        # Create workspace for animation:
-        self._animation = dict()
-
-        # Get start and end steps:
-        if steps is None:
-            steps = range(self.step+1)
-
-        # Define plot update function:
-        def func(frame):
-            return self.visualize(step=frame, *args, **kwargs)
-        def init_func():
-            return self.visualize(step=0, *args, **kwargs)
-
-        # Build animation:
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='polar')
-        self._animation['fig'] = fig
-        self._animation['ax'] = ax
-        anim = matplotlib.animation.FuncAnimation(
-            fig,
-            func,
-            frames=steps,
-            #init_func=init_func,
-            interval=200,
-            blit=True,
-            repeat=False,
-        )
-
-        # Clear workspace:
-        self._animation = None
-
-        return anim
-
-    def plot_positions(self):
-        """
-        Plot positions of vehicles (y axis) over time (x axis):
+        Plot positions of vehicles (y axis) over time (x axis).
+        Optionally, specify step with an iterable (for animation).
         """
         
         # Set plotting options:
         hv_color = 'firebrick'
         av_color = 'seagreen'
         
-        # Create plot:
-        fig,ax = plt.subplots(1,1, figsize=(16,4))
+        # Create plot (or get current axes if animating):
+        if not hasattr(self, '_animation'):
+            self._animation = None        
+        if ax is not None:
+            fig = ax.figure
+        elif self._animation:
+            fig = self._animation['fig']
+            ax = self._animation['ax']
+            ax.clear()
+        else:
+            fig,ax = plt.subplots(1,1, figsize=(16,4))
 
         # Collect artists (for pyplot animation):
         artists = []
+
+        # Get steps to plot:
+        if steps is None:
+            steps = range(0,self.step)
         
         # Plot each vehicle:
         for vehicle in self.all_vehicles:
             # Get a table of state history for this vehicle:
-            table = vehicle.get_state_table(keys=['step','time','pos'])
+            table = vehicle.get_state_table(keys=['step','time','pos'], steps=steps)
             # Set plotting options:
             if vehicle.type=='human':
                 color = hv_color
@@ -557,7 +561,7 @@ class RingRoad:
                 prev_row = this_row
 
         # Add line for AV activation:
-        y_min,y_max = ax.get_ylim()
+        y_min,y_max = 0, self.L
         if self.av_activate < self.t:
             ax.plot([self.av_activate,self.av_activate],[y_min,y_max], ls=':', color='black', alpha=1, zorder=5)
         ax.set_ylim((y_min,y_max))
@@ -567,27 +571,45 @@ class RingRoad:
         ax.set_xlabel("time (seconds)")
         ax.set_ylabel("position (meters)")
         
-        return fig, ax
+        # Return artists or figure:
+        if self._animation:
+            return tuple(artists)
+        else:
+            return fig, ax
 
-    def plot_velocities(self):
+    def plot_velocities(self, steps=None, show_sigma=False, ax=None):
         """
-        Plot velocities of vehicles (y axis) over time (x axis):
+        Plot velocities of vehicles (y axis) over time (x axis).
+        Optionally, specify step with an iterable (for animation).
         """
         
         # Set plotting options:
         hv_color = 'firebrick'
         av_color = 'seagreen'
         
-        # Create plot:
-        fig,ax = plt.subplots(1,1, figsize=(16,4))
+        # Create plot (or get current axes if animating):
+        if not hasattr(self, '_animation'):
+            self._animation = None
+        if ax is not None:
+            fig = ax.figure
+        elif self._animation:
+            fig = self._animation['fig']
+            ax = self._animation['ax']
+            ax.clear()
+        else:
+            fig,ax = plt.subplots(1,1, figsize=(16,4))
 
         # Collect artists (for pyplot animation):
         artists = []
+
+        # Get steps to plot:
+        if steps is None:
+            steps = range(0,self.step)
         
         # Plot each vehicle:
         for vehicle in self.all_vehicles:
             # Get a table of state history for this vehicle:
-            table = vehicle.get_state_table(keys=['step','time','vel'])
+            table = vehicle.get_state_table(keys=['step','time','vel'], steps=steps)
             # Set plotting options:
             if vehicle.type=='human':
                 color = hv_color
@@ -603,8 +625,15 @@ class RingRoad:
             lines, = ax.plot(table['time'],table['vel'], color=color, alpha=alpha, zorder=zorder)
             artists.append(lines)
 
+        # Plot standard deviation across vehicles:
+        if show_sigma:
+            table = self.get_vehicle_vel_table(steps=steps).std(axis=1).to_frame(name='sigma').reset_index()
+            ax.plot(table['time'], table['sigma'], lw=1, color='grey', label="Standard deviation\nacross all vehicles")
+            ax.legend(loc='center right', fontsize=6)
+
         # Add line for AV activation:
-        y_min,y_max = ax.get_ylim()
+        #y_min,y_max = ax.get_ylim()
+        y_min,y_max = 0, min(30,self.max_speed)*1.05
         if self.av_activate < self.t:
             ax.plot([self.av_activate,self.av_activate],[y_min,y_max], ls=':', color='black', alpha=1, zorder=5)
         ax.set_ylim((y_min,y_max))
@@ -614,7 +643,61 @@ class RingRoad:
         ax.set_xlabel("time (seconds)")
         ax.set_ylabel("velocity (meters/second)")
         
-        return fig, ax
+        # Return artists or figure:
+        if self._animation:
+            return tuple(artists)
+        else:
+            return fig, ax
+
+    def plot_dashboad(self, step=None, total_steps=None, **plot_options):
+        """
+        Plot a combination of plots for a specific step.
+        """
+
+        # Create plot (or get current axes if animating):
+        if not hasattr(self, '_animation'):
+            self._animation = None
+        if self._animation:
+            fig = self._animation['fig']
+            axs = self._animation['axs']
+            ax1,ax2,ax3 = axs
+            for ax in axs:
+                ax.clear()
+        else:
+            fig = plt.figure(figsize=(16,6))
+            ax1 = fig.add_subplot(1, 2, 1, facecolor='white', frameon=False, projection='polar')
+            ax2 = fig.add_subplot(2, 2, 2, facecolor='white')
+            ax3 = fig.add_subplot(2, 2, 4, facecolor='white')
+        
+        if step is None:
+            step = self.step
+
+        # Parse options:
+        ax1_options = dict()
+        ax2_options = dict()
+        ax3_options = dict()
+        for k,v in plot_options.items():
+            if k in {'draw_cars_to_scale','draw_safety_buffer','label_cars','label_step'}:
+                ax1_options[k] = v
+            if k in {}:
+                ax2_options[k] = v
+            if k in {'show_sigma'}:
+                ax3_options[k] = v
+
+        artists = []  # Collect arists for animation.
+        artists.extend( self.visualize(ax=ax1, step=step, **ax1_options) )
+        artists.extend( self.plot_positions(ax=ax2, steps=range(0,step), **ax2_options) )
+        artists.extend( self.plot_velocities(ax=ax3, steps=range(0,step), **ax3_options) )
+        
+        if total_steps is not None:
+            ax2.set_xlim(0,total_steps*self.dt)
+            ax3.set_xlim(0,total_steps*self.dt)
+
+        # Return artists or figure:
+        if self._animation:
+            return tuple(artists)
+        else:
+            return fig, (ax1,ax2,ax3)
 
 class Vehicle:
 
