@@ -2,6 +2,10 @@ import pytest
 
 import numpy as np
 
+# Adjust relative path so that this script can find the code modules:
+import sys
+sys.path.append('code/')
+
 from structures import *
 
 

@@ -5,6 +5,10 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 
+# Adjust relative path so that this script can find the code modules:
+import sys
+sys.path.append('code/')
+
 from structures import *
 
 # Hide warnings about safe distance violation (still in development):
