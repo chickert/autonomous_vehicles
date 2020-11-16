@@ -77,8 +77,8 @@ class RingRoad:
 
 
 
-my_car_positions = [10, 50, 145]
+my_car_positions = [10, 50, 245]
 env = RingRoad(car_positions=my_car_positions, road_length=250, car_length=7)
 
 
-env.visualize(draw_cars_to_scale=False)
+env.visualize(draw_cars_to_scale=True)
