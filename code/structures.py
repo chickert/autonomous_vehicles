@@ -106,7 +106,7 @@ class Position:
 
 class RingRoad:
 
-    def __init__(self, num_vehicles=22, ring_length=230.0, starting_noise=0.5, av_activate=60.0, temporal_res=0.1, seed=None):
+    def __init__(self, num_vehicles=22, ring_length=230.0, starting_noise=0.5, av_activate=60.0, temporal_res=0.1, seed=None, num_avs=1):
         
         # Store properties:
         self.num_vehicles = num_vehicles  # Total number of vehicles (including A.V.).
@@ -124,6 +124,7 @@ class RingRoad:
         self.av_activate = av_activate  # When to activate AV controller (seconds).
         self.starting_noise = starting_noise  # Add noise (in meters) to starting positions.
         self.seed = seed
+        self.num_avs = num_avs
 
         # Store state information:
         self.state = None
@@ -182,19 +183,23 @@ class RingRoad:
     def reset_state(self):
         assert self.num_vehicles >= 2, "Need at least 1 human and 1 robot."
         d_start = self.ring_length / self.num_vehicles
-        robot = Robot(
-            env=self,
-            active_controller = PID(env=self, safe_distance=self.safe_distance, gamma=2.0, m=38),
-            passive_controller = BandoFTL(env=self, a=self.traffic_a, b=self.traffic_b),
-            init_pos = 0.0,
-            init_vel = 0.0,
-            init_acc = 0.0,
-            length = self.vehicle_length,
-        )
-        robot.state['index'] = 0
-        robot.active = (self.av_activate==0)
-        vehicles = [robot]
-        for index in range(1,self.num_vehicles):
+        vehicles = []
+        for index in range(self.num_avs):
+            noise = self.starting_noise
+            noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
+            robot = Robot(
+                env=self,
+                active_controller = PID(env=self, safe_distance=self.safe_distance, gamma=2.0, m=38),
+                passive_controller = BandoFTL(env=self, a=self.traffic_a, b=self.traffic_b),
+                init_pos = index * d_start + noise,
+                init_vel = 0.0,
+                init_acc = 0.0,
+                length = self.vehicle_length,
+            )
+            robot.state['index'] = index
+            robot.active = (self.av_activate==0)
+            vehicles.append(robot)
+        for index in range(self.num_avs, self.num_vehicles):
             noise = self.starting_noise
             noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
             human = Human(
