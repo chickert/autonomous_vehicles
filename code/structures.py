@@ -136,9 +136,9 @@ class RingRoad:
         self.av_activate = av_activate  # When to activate AV controller (seconds).
         self.starting_noise = starting_noise  # Add noise (in meters) to starting positions.
         self.seed = seed
-        self.num_avs = num_avs
-        self.hv_heterogeneity = hv_heterogeneity
-        self.uncertain_avs=uncertain_avs
+        self.num_avs = num_avs      # Number of AVs
+        self.hv_heterogeneity = hv_heterogeneity    # Set to True for heterogeneity in HVs
+        self.uncertain_avs=uncertain_avs            # Set to True for uncertainty in AVs
 
         # Store state information:
         self.state = None
