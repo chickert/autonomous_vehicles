@@ -107,7 +107,16 @@ class Position:
 
 class RingRoad:
 
-    def __init__(self, num_vehicles=22, ring_length=230.0, starting_noise=0.5, av_activate=60.0, temporal_res=0.1, seed=None, num_avs=1, hv_heterogeneity=False):
+    def __init__(self, num_vehicles=22,
+                 ring_length=230.0,
+                 starting_noise=0.5,
+                 av_activate=60.0,
+                 temporal_res=0.1,
+                 seed=None,
+                 num_avs=1,
+                 hv_heterogeneity=False,
+                 uncertain_avs=False,
+                 ):
         
         # Store properties:
         self.num_vehicles = num_vehicles  # Total number of vehicles (including A.V.).
@@ -129,6 +138,7 @@ class RingRoad:
         self.seed = seed
         self.num_avs = num_avs
         self.hv_heterogeneity = hv_heterogeneity
+        self.uncertain_avs=uncertain_avs
 
         # Store state information:
         self.state = None
@@ -193,7 +203,7 @@ class RingRoad:
             noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
             robot = Robot(
                 env=self,
-                active_controller = PID(env=self, safe_distance=self.safe_distance, gamma=2.0, m=38),
+                active_controller = PID(env=self, safe_distance=self.safe_distance, gamma=2.0, m=38, is_uncertain=self.uncertain_avs),
                 passive_controller = BandoFTL(env=self, a=self.traffic_a, b=self.traffic_b),
                 init_pos = index * d_start + noise,
                 init_vel = 0.0,
