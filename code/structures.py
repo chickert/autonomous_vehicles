@@ -7,6 +7,7 @@ https://doi.org/10.1007/978-3-030-25446-9_12
 
 import warnings
 
+import random
 import numpy as np
 import pandas as pd
 
@@ -106,7 +107,7 @@ class Position:
 
 class RingRoad:
 
-    def __init__(self, num_vehicles=22, ring_length=230.0, starting_noise=0.5, av_activate=60.0, temporal_res=0.1, seed=None, num_avs=1):
+    def __init__(self, num_vehicles=22, ring_length=230.0, starting_noise=0.5, av_activate=60.0, temporal_res=0.1, seed=None, num_avs=1, hv_heterogeneity=False):
         
         # Store properties:
         self.num_vehicles = num_vehicles  # Total number of vehicles (including A.V.).
@@ -121,10 +122,13 @@ class RingRoad:
         self.spatial_res = None
         self.traffic_a = 0.5  # Coefficient for the FTL model (meters/second).
         self.traffic_b = 20  # Coefficient for the Bando-OV model (1/second).
+        self.a_sigma = 0.1  # Std. dev. for 'a' parameter on Bando-FTL model (only for HVs when using HV heterogeneity)
+        self.b_sigma = 4.   # Std. dev. for 'b' parameter on Bando-FTL model (only for HVs when using HV heterogeneity)
         self.av_activate = av_activate  # When to activate AV controller (seconds).
         self.starting_noise = starting_noise  # Add noise (in meters) to starting positions.
         self.seed = seed
         self.num_avs = num_avs
+        self.hv_heterogeneity = hv_heterogeneity
 
         # Store state information:
         self.state = None
@@ -202,9 +206,14 @@ class RingRoad:
         for index in range(self.num_avs, self.num_vehicles):
             noise = self.starting_noise
             noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
+            a_noise = random.gauss(mu=0, sigma=self.a_sigma)     # Noise on Bando-FTL a parameter
+            b_noise = random.gauss(mu=0, sigma=self.b_sigma)      # Noise on Bando-FTL b parameter
             human = Human(
                 env=self,
-                controller = BandoFTL(env=self, a=self.traffic_a, b=self.traffic_b),
+                controller = BandoFTL(env=self,
+                                      a=(self.traffic_a + a_noise) if self.hv_heterogeneity else self.traffic_a,
+                                      b=(self.traffic_b + b_noise) if self.hv_heterogeneity else self.traffic_b,
+                                      ),
                 init_pos = index * d_start + noise,
                 init_vel = 0.0,
                 init_acc = 0.0,
