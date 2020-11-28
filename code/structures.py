@@ -209,6 +209,11 @@ class RingRoad:
                 init_vel = 0.0,
                 init_acc = 0.0,
                 length = self.vehicle_length,
+                min_vel = self.min_speed,
+                max_vel = self.max_speed,
+                min_acc = self.min_accel,
+                max_acc = self.max_accel,
+                control_lag = self.control_lag,
             )
             robot.state['index'] = index
             robot.active = (self.av_activate==0)
@@ -228,15 +233,15 @@ class RingRoad:
                 init_vel = 0.0,
                 init_acc = 0.0,
                 length = self.vehicle_length,
+                min_vel = self.min_speed,
+                max_vel = self.max_speed,
+                min_acc = self.min_accel,
+                max_acc = self.max_accel,
+                control_lag = self.control_lag,
             )
             human.state['index'] = index
             vehicles.append(human)
         for vehicle in vehicles:
-            # Adjust kinematics:
-            vehicle.min_vel = self.min_speed
-            vehicle.max_vel = self.max_speed
-            vehicle.min_acc = self.min_accel
-            vehicle.max_acc = self.max_accel# + np.round(self.random.uniform(-0.25,0.25),2)
             # Add vehicle:
             self.all_vehicles.add(vehicle)
         self.state = {
