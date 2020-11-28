@@ -5,6 +5,7 @@ Data structures for simulation of autonomous vehicle controllers presented by De
 https://doi.org/10.1007/978-3-030-25446-9_12
 """
 
+import os
 import warnings
 
 import numpy as np
@@ -13,7 +14,7 @@ import pandas as pd
 import matplotlib.animation
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-
+from matplotlib.animation import FuncAnimation, PillowWriter  
 
 from controllers import Controller, BandoFTL, PID
 
@@ -700,6 +701,90 @@ class RingRoad:
             return tuple(artists)
         else:
             return fig, (ax1,ax2,ax3)
+
+    def build_animation(self, speedup=1.0, interval=1, kind='dashboard', axs=None, **plot_options):
+        """
+        speedup:
+            (float) Multiplier for how fast to show animation relative to actual time
+            (e.g. speedup of 1.0 is realtime, a speedup of 10.0 is ten times faster).
+        interval:
+            (int) Interval between steps that are included as animation frames
+            (e.g. an interval of 1 plots every frame, and interval of 10 plots every tenth frame).
+        kind:
+
+        """
+
+        valid_kinds = {'positions','velocities','dashboard','ring'}
+        assert kind in valid_kinds, "{} is not a valid kind: {} .".format(kind,valid_kinds)
+
+        # Check inputs:
+        assert speedup > 0, "speedup should be a positive multiplier."
+        assert (interval>0) and (interval == int(interval)), "interval should be a positive integer."
+        interval = int(interval)
+
+        # Calculate frame rate (used when saving GIF):
+        fps = 1/self.dt/interval*speedup
+
+        if axs:
+            fig = axs[0].figure
+        else:
+            fig = plt.figure(figsize=(9,7))
+            ax1 = fig.add_subplot(1, 2, 1, facecolor='white', frameon=False, projection='polar')
+            ax2 = fig.add_subplot(2, 2, 2, facecolor='white')
+            ax3 = fig.add_subplot(2, 2, 4, facecolor='white')
+            axs = (ax1,ax2,ax3)
+
+
+        self.start_animation(fig=fig, axs=axs)
+        self._animation['fps'] = fps
+        self._animation['speedup'] = speedup
+        self._animation['interval'] = interval
+
+        def init_func():
+            pass
+
+        def func(i):
+            if kind=='dashboard':
+                self.plot_dashboard(
+                    step = i,
+                    total_steps = self.step,  # Final step.
+                    **plot_options  # Keyword arugments.
+                )
+            elif kind=='positions':
+                self.plot_positions(steps=range(0,i+1), **plot_options)
+            elif kind=='velocities':
+                self.plot_velocities(steps=range(0,i+1), **plot_options)
+            elif kind=='ring':
+                self.visualize(step=i, **plot_options)
+            else:
+                raise NotImplementedError("Kind {} is not yet implemented.".format(kind))
+
+        frames = np.arange(0,self.step,interval)
+
+        anim = FuncAnimation(fig=fig, func=func, frames=frames, init_func=init_func)
+        self._animation['anim'] = anim
+
+        # self.stop_animation()
+
+        return anim
+
+    def save_gif(self, filepath, overwrite=False):
+
+        # Get animation:
+        if (not hasattr(self, '_animation')) or (self._animation is None):
+            raise RuntimeError("No animation in progress.")
+        elif not ('anim' in self._animation):
+            raise RuntimeError("Animation has not been built.")
+        anim = self._animation['anim']
+        fps = self._animation['fps']
+
+        # Save to GIF (sometimes slow):
+        if os.path.isfile(filepath) and (not overwrite):
+            raise FileExistsError("overwrite=False and file already exists: {}".format(filepath))
+        writer = PillowWriter(fps=fps)
+        anim.save(filepath, writer=writer)
+        print("Saved : {} .".format(filepath))
+
 
 class Vehicle:
 
