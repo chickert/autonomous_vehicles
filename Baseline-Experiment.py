@@ -30,19 +30,19 @@ total_steps = int(np.ceil(total_time/env.dt))
 env.run(steps=total_steps)
 
 # Plot initial state:
-fig,ax = env.visualize(step=0, draw_cars_to_scale=True, draw_safety_buffer=False)
+fig,ax = env.plot_ring(step=0, draw_cars_to_scale=True, draw_safety_buffer=False)
 filename = "outputs/environment_initial_state.png"
 plt.savefig(filename)
 print("Saved : {} .".format(filename))
 
 # Plot state at activation:
-fig,ax = env.visualize(step=int(np.ceil(env.av_activate/env.dt))-1, draw_cars_to_scale=True, draw_safety_buffer=False)
+fig,ax = env.plot_ring(step=int(np.ceil(env.av_activate/env.dt))-1, draw_cars_to_scale=True, draw_safety_buffer=False)
 filename = "outputs/environment_before_activation.png"
 plt.savefig(filename)
 print("Saved : {} .".format(filename))
 
 # Plot stable state:
-fig,ax = env.visualize(step=env.step, draw_cars_to_scale=True, draw_safety_buffer=False)
+fig,ax = env.plot_ring(step=env.step, draw_cars_to_scale=True, draw_safety_buffer=False)
 filename = "outputs/environment_stable_state.png"
 plt.savefig(filename)
 print("Saved : {} .".format(filename))
