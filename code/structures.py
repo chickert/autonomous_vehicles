@@ -237,7 +237,6 @@ class RingRoad:
             vehicle.max_vel = self.max_speed
             vehicle.min_acc = self.min_accel
             vehicle.max_acc = self.max_accel# + np.round(self.random.uniform(-0.25,0.25),2)
-            vehicle.min_acc =  - vehicle.max_acc
             # Add vehicle:
             self.all_vehicles.add(vehicle)
         self.state = {
