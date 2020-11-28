@@ -388,7 +388,7 @@ class RingRoad:
         if ax:
             fig = ax.figure
         else:
-            fig = plt.figure(figsize=(8,8))
+            fig = plt.figure(figsize=(6,6))
             ax = fig.add_subplot(facecolor='white', frameon=False, projection='polar')
 
         # Find the radius of the ring given the RingRoad length
@@ -476,7 +476,7 @@ class RingRoad:
         else:
             return fig, ax
 
-    def plot_positions(self, steps=None, ax=None, animation_mode=False):
+    def plot_positions(self, steps=None, total_steps=None, ax=None, animation_mode=False):
         """
         Plot positions of vehicles (y axis) over time (x axis).
         Optionally, specify step with an iterable (for animation).
@@ -490,7 +490,7 @@ class RingRoad:
         if ax:
             fig = ax.figure
         else:
-            fig,ax = plt.subplots(1,1, figsize=(16,4))
+            fig,ax = plt.subplots(1,1, figsize=(9,4))
 
         # Collect artists (for pyplot animation):
         artists = []
@@ -547,13 +547,17 @@ class RingRoad:
         ax.set_xlabel("time (seconds)")
         ax.set_ylabel("position (meters)")
         
+        # Set x limits:
+        if total_steps:
+            ax.set_xlim(0,total_steps*self.dt)
+        
         # Return artists or figure:
         if animation_mode:
             return tuple(artists)
         else:
             return fig, ax
 
-    def plot_velocities(self, steps=None, show_sigma=False, ax=None, animation_mode=False):
+    def plot_velocities(self, steps=None, total_steps=None, show_sigma=False, ax=None, animation_mode=False):
         """
         Plot velocities of vehicles (y axis) over time (x axis).
         Optionally, specify step with an iterable (for animation).
@@ -567,7 +571,7 @@ class RingRoad:
         if ax:
             fig = ax.figure
         else:
-            fig,ax = plt.subplots(1,1, figsize=(16,4))
+            fig,ax = plt.subplots(1,1, figsize=(9,4))
 
         # Collect artists (for pyplot animation):
         artists = []
@@ -607,6 +611,10 @@ class RingRoad:
         if self.av_activate < self.t:
             ax.plot([self.av_activate,self.av_activate],[y_min,y_max], ls=':', color='black', alpha=1, zorder=5)
         ax.set_ylim((y_min,y_max))
+        
+        # Set x limits:
+        if total_steps:
+            ax.set_xlim(0,total_steps*self.dt)
                 
         # Set axes:
         #ax.set_title("Velocity over time")
@@ -630,7 +638,7 @@ class RingRoad:
             assert len(axs)==3, "Expect axs as a tuple of three axes."
             ax1, ax2, ax3 = axs
         else:
-            fig = plt.figure(figsize=(16,6))
+            fig = plt.figure(figsize=(9,7))
             ax1 = fig.add_subplot(1, 2, 1, facecolor='white', frameon=False, projection='polar')
             ax2 = fig.add_subplot(2, 2, 2, facecolor='white')
             ax3 = fig.add_subplot(2, 2, 4, facecolor='white')
@@ -653,12 +661,8 @@ class RingRoad:
 
         artists = []  # Collect arists for animation.
         artists.extend( self.visualize(ax=ax1, step=step, **ax1_options) )
-        artists.extend( self.plot_positions(ax=ax2, steps=range(0,step), **ax2_options) )
-        artists.extend( self.plot_velocities(ax=ax3, steps=range(0,step), **ax3_options) )
-        
-        if total_steps is not None:
-            ax2.set_xlim(0,total_steps*self.dt)
-            ax3.set_xlim(0,total_steps*self.dt)
+        artists.extend( self.plot_positions(ax=ax2, steps=range(0,step), total_steps=total_steps, **ax2_options) )
+        artists.extend( self.plot_velocities(ax=ax3, steps=range(0,step), total_steps=total_steps, **ax3_options) )
 
         # Return artists or figure:
         if animation_mode:

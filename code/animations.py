@@ -69,7 +69,7 @@ class Animation:
         if ax:
             fig = ax.figure
         else:
-            fig = plt.figure(figsize=(7,7))
+            fig = plt.figure(figsize=(6,6))
             ax = fig.add_subplot(facecolor='white', frameon=False, projection='polar')
         # Define plot initialization function:
         def init_func():
@@ -111,6 +111,7 @@ class Animation:
             ax.clear()
             self.env.plot_positions(
                 steps=range(0,i+1),  # This and all previous steps.
+                total_steps = self.env.step,  # Final step.
                 ax = ax, animation_mode=True,
                 **plot_options  # Keyword arugments.
             )
@@ -143,6 +144,7 @@ class Animation:
             ax.clear()
             self.env.plot_velocities(
                 steps=range(0,i+1),  # This and all previous steps.
+                total_steps = self.env.step,  # Final step.
                 ax = ax, animation_mode=True,
                 **plot_options  # Keyword arugments.
             )
