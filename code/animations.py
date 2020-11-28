@@ -1,6 +1,7 @@
 """
 Wrapper class to produce animations of a RingRoad object
 by iterative calling its built-in plotting functions.
+Reference: https://www.c-sharpcorner.com/article/create-animated-gif-using-python-matplotlib/
 """
 
 import os
@@ -9,10 +10,6 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
-
-# TEMP (for linting):
-from structures import RingRoad
-env = RingRoad()
 
 
 class Animation:
