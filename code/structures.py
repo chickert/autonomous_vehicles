@@ -367,9 +367,9 @@ class RingRoad:
             vehicle.state['index'] = index
             vehicle.state['step'] = self.state['step']
             vehicle.state['time'] = self.state['time']
-            vehicle.state['control'] = controls[index]  # Unconstrainted command.
-            vehicle.acc = controls[index]  # Enforces kinematic constraints.
-            vehicle.vel += vehicle.acc*self.dt
+            vehicle.control = controls[index]  # Add unconstrainted command to control buffer.
+            vehicle.acc = vehicle.control  # Get control (possibly with lag).
+            vehicle.vel += vehicle.acc*self.dt  # Apply acceleration (with constraints on acc and vel).
             vehicle.pos += vehicle.vel*self.dt
 
         # Make sure there has been no illegal passing or tailgaiting.
