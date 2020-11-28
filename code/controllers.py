@@ -178,8 +178,11 @@ class PID(Controller):
         last_step = self.env.step
         state_history = this_vehicle.get_state_table(steps=range(first_step,last_step))
         velocity_history = np.array(state_history['pos'])
-        # Get command history (by adding last velocity to constrained control):
-        last_commanded_velocity = state_history['vel'].iloc[-1] + state_history['control'].iloc[-1]
+        # Get command history (by adding unconstrained control to the velocity it was calculated from):
+        if len(state_history['vel'])>=2:
+            last_commanded_velocity = state_history['control'].iloc[-1] + state_history['vel'].iloc[-2]
+        else:
+            last_commanded_velocity = state_history['control'].iloc[-1]
 
         # Calculate command velocity and return control:
         command_velocity = self.update_command_velocity(delta_x, velocity_history, last_commanded_velocity, lead_vehicle_velocity)
