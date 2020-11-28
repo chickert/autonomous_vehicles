@@ -2,6 +2,7 @@ import warnings
 
 import numpy as np
 import pandas as pd
+import random
 
 
 class Controller:
@@ -84,7 +85,7 @@ class PID(Controller):
     and the distance to and velocity of its lead vehicle (i.e. the one directly in front).
     """
 
-    def __init__(self, env, safe_distance, gamma, m):
+    def __init__(self, env, safe_distance, gamma, m, temporal_res=1, is_uncertain=False, sigma_pct=0.2):
         """
         PID Controller from Delle Monarche et al. (2019).
 
@@ -103,7 +104,11 @@ class PID(Controller):
 
         self.stored_command_velocity = None
         self.m = m
+        self.temporal_res = temporal_res
         self.stored_velocities = []
+
+        self.is_uncertain = is_uncertain    # whether or not to include noise in calculation
+        self.sigma_pct = sigma_pct   # tunes amount of uncertainty to add if is_uncertain=True
 
     def calc_alpha(self, delta_x):
         target = (delta_x - self.safe_distance) / self.gamma   # delta_x corresponds to current distance between AV and lead vehicle
@@ -119,25 +124,16 @@ class PID(Controller):
 
     def calc_desired_velocity(self, velocity_history):
         """
-        Question here is in regards to paragraph just above eqn 12.13:
-        It says to average over the "autonomous vehicle velocities over the last m measurements"
-        I assume this is the true velocities; can we assume that the commanded velocity is the same as this?
-        I make that assumption below, but we should discuss or just double-check
+        Calculates desired velocity
         """
-        v_d = np.mean(velocity_history)
+        sliding_window = int(self.m * (1/self.temporal_res))
+        v_d = np.mean(velocity_history[-sliding_window:])
 
-        """
-        NEED TO UPDATE this to take self.m * (1/time_discretization) so for m=38 and time disc of 0.1s, it takes 380
-        values instead of 38 values! 
-        """
         return v_d
 
     def calc_target_velocity(self, delta_x, velocity_history):
         """
-        The target here is very similar to eqn in self.calc_alpha(); same structure, but hard-coded values.
-        So I'm wondering if they should be the same?
-        If so, why don't they have alpha_j in eqn 12.13 where v_target is defined?
-        If not, what do the 7 and 23 correspond to, and why are they hard-coded?
+        Calculates target velocity
         """
         v_d = self.calc_desired_velocity(velocity_history)
 
@@ -146,6 +142,9 @@ class PID(Controller):
         return v_target
 
     def update_command_velocity(self, delta_x, velocity_history, last_commanded_velocity, lead_vehicle_velocity):
+        """
+        Calculates update to command velocity
+        """
         vj_target = self.calc_target_velocity(delta_x, velocity_history)
         prior_uj = last_commanded_velocity
         vj_lead = lead_vehicle_velocity
@@ -156,13 +155,6 @@ class PID(Controller):
         new_uj = beta_j * (alpha_j * vj_target + (1 - alpha_j) * vj_lead) + (1 - beta_j) * prior_uj
 
         updated_command_velocity = new_uj
-        """
-        NOTE [relevant to calc_desired_velocity() above]:
-        Here I assume that the updated command velocity is equal to the actual vehicle velocity, but need to double-check
-        that what is commanded is actually implemented, and there's no 'stickiness' or other factors that affect the actual
-        implementation of the commanded velocity
-        (such as if actual velocity was a moving average of commanded velocities, for example)
-        """
         return updated_command_velocity
 
     def calculate(self, this_vehicle):
@@ -175,6 +167,11 @@ class PID(Controller):
         lead_vehicle = self.env.get_lead_vehicle(this_vehicle)
         delta_x = this_vehicle.pos.distance_to(lead_vehicle.pos)
         lead_vehicle_velocity = lead_vehicle.vel
+
+        # Add uncertainty to measurements of delta_x and lead_vehicle_velocity if simulating AVs with uncertainty:
+        if self.is_uncertain:
+            delta_x = random.gauss(mu=delta_x, sigma=delta_x*self.sigma_pct)
+            lead_vehicle_velocity = random.gauss(mu=lead_vehicle_velocity, sigma=lead_vehicle_velocity*self.sigma_pct)
 
         # Get relevant velocity history:
         first_step = max(0, self.env.step - int(self.m / self.env.dt))  # Divide by temporal resolution.
