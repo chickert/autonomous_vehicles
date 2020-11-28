@@ -363,6 +363,8 @@ class RingRoad:
             self.run_step()
 
     def start_animation(self, fig, axs):
+        if hasattr(self, '_animation') and (self._animation is not None):
+            raise RuntimeError("Animation already in progress.")
         self._animation = {
             'fig' : fig,
         }
