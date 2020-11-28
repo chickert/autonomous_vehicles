@@ -110,30 +110,41 @@ class RingRoad:
     def __init__(self,
                  num_vehicles=22,
                  ring_length=230.0,
+                 vehicle_length=4.5,
+                 safe_distance=4.0,
+                 min_speed=0.00,
+                 max_speed=9.75,
+                 min_accel=-6.75,
+                 max_accel=6.50,
                  starting_noise=0.5,
+                 traffic_a=0.5,
+                 traffic_b=20,
+                 a_sigma=0.1,
+                 b_sigma=4.0,
                  av_activate=60.0,
                  temporal_res=0.1,
-                 seed=None,
+                 control_lag=0.0,
                  num_avs=1,
                  hv_heterogeneity=False,
                  uncertain_avs=False,
+                 seed=None,
                  ):
         
         # Store properties:
         self.num_vehicles = num_vehicles  # Total number of vehicles (including A.V.).
         self.ring_length = ring_length  # Length of ring road (meters).
-        self.vehicle_length = 4.5  # Length of vehicles (meters).
-        self.safe_distance = 4.0  # Safe distance between vehicles (meters).
-        self.min_speed = 0.00  # Min velocity (meters/second).
-        self.max_speed = 9.75  # Max velocity (meters/second).
-        self.min_accel = -7  # Min acceleration (meters/second^2).
-        self.max_accel = 6.50  # Max acceleration (meters/second^2).
+        self.vehicle_length = vehicle_length  # Length of vehicles (meters).
+        self.safe_distance = safe_distance  # Safe distance between vehicles (meters).
+        self.min_speed = min_speed  # Min velocity (meters/second).
+        self.max_speed = max_speed  # Max velocity (meters/second).
+        self.min_accel = min_accel  # Min acceleration (meters/second^2).
+        self.max_accel = max_accel  # Max acceleration (meters/second^2).
+        self.control_lag = control_lag  # How long between when control is calculated and when it is applied (seconds).
         self.temporal_res = temporal_res  # Time between updates (in seconds).
-        self.spatial_res = None
-        self.traffic_a = 0.5  # Coefficient for the FTL model (meters/second).
-        self.traffic_b = 20  # Coefficient for the Bando-OV model (1/second).
-        self.a_sigma = 0.1  # Std. dev. for 'a' parameter on Bando-FTL model (only for HVs when using HV heterogeneity)
-        self.b_sigma = 4.   # Std. dev. for 'b' parameter on Bando-FTL model (only for HVs when using HV heterogeneity)
+        self.traffic_a = traffic_a  # Coefficient for the FTL model (meters/second).
+        self.traffic_b = traffic_b  # Coefficient for the Bando-OV model (1/second).
+        self.a_sigma = a_sigma  # Std. dev. for 'a' parameter on Bando-FTL model (only for HVs when using HV heterogeneity)
+        self.b_sigma = b_sigma  # Std. dev. for 'b' parameter on Bando-FTL model (only for HVs when using HV heterogeneity)
         self.av_activate = av_activate  # When to activate AV controller (seconds).
         self.starting_noise = starting_noise  # Add noise (in meters) to starting positions.
         self.seed = seed
@@ -211,6 +222,11 @@ class RingRoad:
                 init_vel = 0.0,
                 init_acc = 0.0,
                 length = self.vehicle_length,
+                min_vel = self.min_speed,
+                max_vel = self.max_speed,
+                min_acc = self.min_accel,
+                max_acc = self.max_accel,
+                control_lag = self.control_lag,
             )
             robot.state['index'] = index
             robot.active = (self.av_activate==0)
@@ -230,16 +246,15 @@ class RingRoad:
                 init_vel = 0.0,
                 init_acc = 0.0,
                 length = self.vehicle_length,
+                min_vel = self.min_speed,
+                max_vel = self.max_speed,
+                min_acc = self.min_accel,
+                max_acc = self.max_accel,
+                control_lag = self.control_lag,
             )
             human.state['index'] = index
             vehicles.append(human)
         for vehicle in vehicles:
-            # Adjust kinematics:
-            vehicle.min_vel = self.min_speed
-            vehicle.max_vel = self.max_speed
-            vehicle.min_acc = self.min_accel
-            vehicle.max_acc = self.max_accel# + np.round(self.random.uniform(-0.25,0.25),2)
-            vehicle.min_acc =  - vehicle.max_acc
             # Add vehicle:
             self.all_vehicles.add(vehicle)
         self.state = {
@@ -369,9 +384,9 @@ class RingRoad:
             vehicle.state['index'] = index
             vehicle.state['step'] = self.state['step']
             vehicle.state['time'] = self.state['time']
-            vehicle.state['control'] = controls[index]  # Unconstrainted command.
-            vehicle.acc = controls[index]  # Enforces kinematic constraints.
-            vehicle.vel += vehicle.acc*self.dt
+            vehicle.control = controls[index]  # Add unconstrainted command to control buffer.
+            vehicle.acc = vehicle.control  # Get control (possibly with lag).
+            vehicle.vel += vehicle.acc*self.dt  # Apply acceleration (with constraints on acc and vel).
             vehicle.pos += vehicle.vel*self.dt
 
         # Make sure there has been no illegal passing or tailgaiting.
@@ -729,7 +744,11 @@ class Vehicle:
 
     all_vehicles = []
 
-    def __init__(self, env, controller=None, init_pos=0.0, init_vel=0.0, init_acc=0.0, length=4.5):
+    def __init__(self, env,
+        controller=None, control_lag=0.0,
+        init_pos=0.0, init_vel=0.0, init_acc=0.0, length=4.5,
+        min_vel=0, max_vel=float("+Inf"), min_acc=float("-Inf"), max_acc=float("+Inf"),
+    ):
 
         # Generate unique ID and add to master list:
         self.id = len(Vehicle.all_vehicles)
@@ -749,10 +768,11 @@ class Vehicle:
         self.length = length
         
         # Set constraints:
-        self.min_vel = 0
-        self.max_vel = float("+Inf")
-        self.min_acc = float("-Inf")
-        self.max_acc = float("+Inf")
+        self.min_vel = min_vel
+        self.max_vel = max_vel
+        self.min_acc = min_acc
+        self.max_acc = max_acc
+        self.control_lag = control_lag  # Lag in seconds between when control is queued and when it is applied.
 
         # Store state information:
         self.state = None
@@ -785,6 +805,10 @@ class Vehicle:
     def acc(self):
         return self.state['acc']
 
+    @property
+    def control(self):
+        return self.state['control']
+
     @pos.setter
     def pos(self, pos):
         self.state['pos'] = Position(x=pos, L=self.env.L)
@@ -801,7 +825,13 @@ class Vehicle:
         acc = min(acc, self.max_acc)
         self.state['acc'] = acc
 
+    @control.setter
+    def control(self, control):
+        self.state['control_buffer'].append(control)  # Add new value to end of queue.
+        self.state['control'] = self.state['control_buffer'].pop(0)  # Promote first value in queue to next control.
+
     def reset_state(self):
+        control_lag_steps = int(np.ceil(self.control_lag/self.env.dt))
         self.state = {
             'time' : self.env.t,
             'step' : self.env.step,
@@ -810,10 +840,13 @@ class Vehicle:
             'vel' : self.init_vel,
             'acc' : self.init_acc,
             'control' : self.init_acc,
+            'control_buffer' : [self.init_acc for _ in range(control_lag_steps)],
             'controller_type' : self.controller.type,
         }
 
     def copy_state(self):
+        state = self.state.copy()
+        state['control_buffer'] = state['control_buffer'].copy()
         return self.state.copy()
 
     def archive_state(self):
