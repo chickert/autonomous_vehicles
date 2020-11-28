@@ -649,7 +649,7 @@ class RingRoad:
         else:
             return fig, ax
 
-    def plot_dashboad(self, step=None, total_steps=None, **plot_options):
+    def plot_dashboard(self, step=None, total_steps=None, **plot_options):
         """
         Plot a combination of plots for a specific step.
         """
