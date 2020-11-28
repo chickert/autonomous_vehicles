@@ -133,10 +133,7 @@ class PID(Controller):
 
     def calc_target_velocity(self, delta_x, velocity_history):
         """
-        The target here is very similar to eqn in self.calc_alpha(); same structure, but hard-coded values.
-        So I'm wondering if they should be the same?
-        If so, why don't they have alpha_j in eqn 12.13 where v_target is defined?
-        If not, what do the 7 and 23 correspond to, and why are they hard-coded?
+        Calculates target velocity
         """
         v_d = self.calc_desired_velocity(velocity_history)
 
@@ -145,6 +142,9 @@ class PID(Controller):
         return v_target
 
     def update_command_velocity(self, delta_x, velocity_history, last_commanded_velocity, lead_vehicle_velocity):
+        """
+        Calculates update to command velocity
+        """
         vj_target = self.calc_target_velocity(delta_x, velocity_history)
         prior_uj = last_commanded_velocity
         vj_lead = lead_vehicle_velocity
@@ -155,13 +155,6 @@ class PID(Controller):
         new_uj = beta_j * (alpha_j * vj_target + (1 - alpha_j) * vj_lead) + (1 - beta_j) * prior_uj
 
         updated_command_velocity = new_uj
-        """
-        NOTE [relevant to calc_desired_velocity() above]:
-        Here I assume that the updated command velocity is equal to the actual vehicle velocity, but need to double-check
-        that what is commanded is actually implemented, and there's no 'stickiness' or other factors that affect the actual
-        implementation of the commanded velocity
-        (such as if actual velocity was a moving average of commanded velocities, for example)
-        """
         return updated_command_velocity
 
     def calculate(self, this_vehicle):
