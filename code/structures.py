@@ -727,7 +727,11 @@ class Vehicle:
 
     all_vehicles = []
 
-    def __init__(self, env, controller=None, init_pos=0.0, init_vel=0.0, init_acc=0.0, length=4.5):
+    def __init__(self, env,
+        controller=None, control_lag=0.0,
+        init_pos=0.0, init_vel=0.0, init_acc=0.0, length=4.5,
+        min_vel=0, max_vel=float("+Inf"), min_acc=float("-Inf"), max_acc=float("+Inf"),
+    ):
 
         # Generate unique ID and add to master list:
         self.id = len(Vehicle.all_vehicles)
@@ -747,10 +751,11 @@ class Vehicle:
         self.length = length
         
         # Set constraints:
-        self.min_vel = 0
-        self.max_vel = float("+Inf")
-        self.min_acc = float("-Inf")
-        self.max_acc = float("+Inf")
+        self.min_vel = min_vel
+        self.max_vel = max_vel
+        self.min_acc = min_acc
+        self.max_acc = max_acc
+        self.control_lag = control_lag  # Lag in seconds between when control is queued and when it is applied.
 
         # Store state information:
         self.state = None
@@ -783,6 +788,10 @@ class Vehicle:
     def acc(self):
         return self.state['acc']
 
+    @property
+    def control(self):
+        return self.state['control']
+
     @pos.setter
     def pos(self, pos):
         self.state['pos'] = Position(x=pos, L=self.env.L)
@@ -799,7 +808,13 @@ class Vehicle:
         acc = min(acc, self.max_acc)
         self.state['acc'] = acc
 
+    @control.setter
+    def control(self, control):
+        self.state['control_buffer'].append(control)  # Add new value to end of queue.
+        self.state['control'] = self.state['control_buffer'].pop(0)  # Promote first value in queue to next control.
+
     def reset_state(self):
+        control_lag_steps = int(np.ceil(self.control_lag/self.env.dt))
         self.state = {
             'time' : self.env.t,
             'step' : self.env.step,
@@ -808,10 +823,13 @@ class Vehicle:
             'vel' : self.init_vel,
             'acc' : self.init_acc,
             'control' : self.init_acc,
+            'control_buffer' : [self.init_acc for _ in range(control_lag_steps)],
             'controller_type' : self.controller.type,
         }
 
     def copy_state(self):
+        state = self.state.copy()
+        state['control_buffer'] = state['control_buffer'].copy()
         return self.state.copy()
 
     def archive_state(self):
