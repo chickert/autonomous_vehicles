@@ -107,7 +107,8 @@ class Position:
 
 class RingRoad:
 
-    def __init__(self, num_vehicles=22,
+    def __init__(self,
+                 num_vehicles=22,
                  ring_length=230.0,
                  starting_noise=0.5,
                  av_activate=60.0,
@@ -147,6 +148,7 @@ class RingRoad:
 
         # Initialize:
         self.random = np.random.RandomState(seed)
+        self.gauss_random = random.seed(seed)
         self.reset_state()
         self.archive_state()
 
