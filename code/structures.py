@@ -5,16 +5,13 @@ Data structures for simulation of autonomous vehicle controllers presented by De
 https://doi.org/10.1007/978-3-030-25446-9_12
 """
 
-import os
 import warnings
 
 import numpy as np
 import pandas as pd
 
-import matplotlib.animation
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation, PillowWriter  
 
 from controllers import Controller, BandoFTL, PID
 
@@ -363,26 +360,14 @@ class RingRoad:
         for s in range(steps):
             self.run_step()
 
-    def start_animation(self, fig, axs):
-        # if hasattr(self, '_animation') and (self._animation is not None):
-        #     raise RuntimeError("Animation already in progress.")
-        self._animation = {
-            'fig' : fig,
-        }
-        try:
-            axs[0]  # For single ax.
-        except:
-            axs = tuple([axs])
-        self._animation['axs'] = axs
-        plt.ion()
-        plt.show(block=False)
+    def visualize(self, *args, **kwargs):
+        """(Redirect for `plot_ring`, included for backward compatibility.)"""
+        return self.plot_ring(*args, **kwargs)
 
-    def stop_animation(self):
-        self._animation = None
-        plt.ioff()
-        plt.close()
-
-    def visualize(self, step=None, draw_cars_to_scale=False, draw_safety_buffer=False, label_step=True, label_cars=True, ax=None):
+    def plot_ring(self, step=None, draw_cars_to_scale=False, draw_safety_buffer=False, label_step=True, label_cars=True, ax=None, animation_mode=False):
+        """
+        Plot the positions of the vehicles on the ring road at the specified time step.
+        """
 
         # Plot latest step by default:
         if step is None:
@@ -399,18 +384,12 @@ class RingRoad:
         hv_color = 'firebrick'
         av_color = 'seagreen'
 
-        # Create plot (or get current axes if animating):
-        if not hasattr(self, '_animation'):
-            self._animation = None
-        if ax is not None:
+        # Create axes (or use existing ones):
+        if ax:
             fig = ax.figure
-        elif self._animation:
-            fig = self._animation['fig']
-            ax = self._animation['ax']
-            ax.clear()
         else:
-            fig = plt.figure()
-            ax = fig.add_subplot(projection='polar')
+            fig = plt.figure(figsize=(8,8))
+            ax = fig.add_subplot(facecolor='white', frameon=False, projection='polar')
 
         # Find the radius of the ring given the RingRoad length
         road_radius = self.ring_length / (2 * np.pi)
@@ -492,12 +471,12 @@ class RingRoad:
         ax.set_ylim((0,(road_radius+road_width/2)*1.05))
         
         # Return artists or figure:
-        if self._animation:
+        if animation_mode:
             return tuple(artists)
         else:
             return fig, ax
 
-    def plot_positions(self, steps=None, ax=None):
+    def plot_positions(self, steps=None, ax=None, animation_mode=False):
         """
         Plot positions of vehicles (y axis) over time (x axis).
         Optionally, specify step with an iterable (for animation).
@@ -507,15 +486,9 @@ class RingRoad:
         hv_color = 'firebrick'
         av_color = 'seagreen'
         
-        # Create plot (or get current axes if animating):
-        if not hasattr(self, '_animation'):
-            self._animation = None        
-        if ax is not None:
+        # Create axes (or use existing ones):
+        if ax:
             fig = ax.figure
-        elif self._animation:
-            fig = self._animation['fig']
-            ax = self._animation['ax']
-            ax.clear()
         else:
             fig,ax = plt.subplots(1,1, figsize=(16,4))
 
@@ -575,12 +548,12 @@ class RingRoad:
         ax.set_ylabel("position (meters)")
         
         # Return artists or figure:
-        if self._animation:
+        if animation_mode:
             return tuple(artists)
         else:
             return fig, ax
 
-    def plot_velocities(self, steps=None, show_sigma=False, ax=None):
+    def plot_velocities(self, steps=None, show_sigma=False, ax=None, animation_mode=False):
         """
         Plot velocities of vehicles (y axis) over time (x axis).
         Optionally, specify step with an iterable (for animation).
@@ -590,15 +563,9 @@ class RingRoad:
         hv_color = 'firebrick'
         av_color = 'seagreen'
         
-        # Create plot (or get current axes if animating):
-        if not hasattr(self, '_animation'):
-            self._animation = None
-        if ax is not None:
+        # Create axes (or use existing ones):
+        if ax:
             fig = ax.figure
-        elif self._animation:
-            fig = self._animation['fig']
-            ax = self._animation['ax']
-            ax.clear()
         else:
             fig,ax = plt.subplots(1,1, figsize=(16,4))
 
@@ -647,30 +614,27 @@ class RingRoad:
         ax.set_ylabel("velocity (meters/second)")
         
         # Return artists or figure:
-        if self._animation:
+        if animation_mode:
             return tuple(artists)
         else:
             return fig, ax
 
-    def plot_dashboard(self, step=None, total_steps=None, **plot_options):
+    def plot_dashboard(self, step=None, total_steps=None, axs=None, animation_mode=False, **plot_options):
         """
         Plot a combination of plots for a specific step.
         """
 
-        # Create plot (or get current axes if animating):
-        if not hasattr(self, '_animation'):
-            self._animation = None
-        if self._animation:
-            fig = self._animation['fig']
-            axs = self._animation['axs']
-            ax1,ax2,ax3 = axs
-            for ax in axs:
-                ax.clear()
+        # Create axes (or use existing ones):
+        if axs:
+            fig = axs[0].figure
+            assert len(axs)==3, "Expect axs as a tuple of three axes."
+            ax1, ax2, ax3 = axs
         else:
             fig = plt.figure(figsize=(16,6))
             ax1 = fig.add_subplot(1, 2, 1, facecolor='white', frameon=False, projection='polar')
             ax2 = fig.add_subplot(2, 2, 2, facecolor='white')
             ax3 = fig.add_subplot(2, 2, 4, facecolor='white')
+            axs = (ax1,ax2,ax3)
         
         if step is None:
             step = self.step
@@ -697,93 +661,10 @@ class RingRoad:
             ax3.set_xlim(0,total_steps*self.dt)
 
         # Return artists or figure:
-        if self._animation:
+        if animation_mode:
             return tuple(artists)
         else:
             return fig, (ax1,ax2,ax3)
-
-    def build_animation(self, speedup=1.0, interval=1, kind='dashboard', axs=None, **plot_options):
-        """
-        speedup:
-            (float) Multiplier for how fast to show animation relative to actual time
-            (e.g. speedup of 1.0 is realtime, a speedup of 10.0 is ten times faster).
-        interval:
-            (int) Interval between steps that are included as animation frames
-            (e.g. an interval of 1 plots every frame, and interval of 10 plots every tenth frame).
-        kind:
-
-        """
-
-        valid_kinds = {'positions','velocities','dashboard','ring'}
-        assert kind in valid_kinds, "{} is not a valid kind: {} .".format(kind,valid_kinds)
-
-        # Check inputs:
-        assert speedup > 0, "speedup should be a positive multiplier."
-        assert (interval>0) and (interval == int(interval)), "interval should be a positive integer."
-        interval = int(interval)
-
-        # Calculate frame rate (used when saving GIF):
-        fps = 1/self.dt/interval*speedup
-
-        if axs:
-            fig = axs[0].figure
-        else:
-            fig = plt.figure(figsize=(9,7))
-            ax1 = fig.add_subplot(1, 2, 1, facecolor='white', frameon=False, projection='polar')
-            ax2 = fig.add_subplot(2, 2, 2, facecolor='white')
-            ax3 = fig.add_subplot(2, 2, 4, facecolor='white')
-            axs = (ax1,ax2,ax3)
-
-
-        self.start_animation(fig=fig, axs=axs)
-        self._animation['fps'] = fps
-        self._animation['speedup'] = speedup
-        self._animation['interval'] = interval
-
-        def init_func():
-            pass
-
-        def func(i):
-            if kind=='dashboard':
-                self.plot_dashboard(
-                    step = i,
-                    total_steps = self.step,  # Final step.
-                    **plot_options  # Keyword arugments.
-                )
-            elif kind=='positions':
-                self.plot_positions(steps=range(0,i+1), **plot_options)
-            elif kind=='velocities':
-                self.plot_velocities(steps=range(0,i+1), **plot_options)
-            elif kind=='ring':
-                self.visualize(step=i, **plot_options)
-            else:
-                raise NotImplementedError("Kind {} is not yet implemented.".format(kind))
-
-        frames = np.arange(0,self.step,interval)
-
-        anim = FuncAnimation(fig=fig, func=func, frames=frames, init_func=init_func)
-        self._animation['anim'] = anim
-
-        # self.stop_animation()
-
-        return anim
-
-    def save_gif(self, filepath, overwrite=False):
-
-        # Get animation:
-        if (not hasattr(self, '_animation')) or (self._animation is None):
-            raise RuntimeError("No animation in progress.")
-        elif not ('anim' in self._animation):
-            raise RuntimeError("Animation has not been built.")
-        anim = self._animation['anim']
-        fps = self._animation['fps']
-
-        # Save to GIF (sometimes slow):
-        if os.path.isfile(filepath) and (not overwrite):
-            raise FileExistsError("overwrite=False and file already exists: {}".format(filepath))
-        writer = PillowWriter(fps=fps)
-        anim.save(filepath, writer=writer)
-        print("Saved : {} .".format(filepath))
 
 
 class Vehicle:
