@@ -109,30 +109,41 @@ class RingRoad:
 
     def __init__(self, num_vehicles=22,
                  ring_length=230.0,
+                 vehicle_length=4.5,
+                 safe_distance=4.0,
+                 min_speed=0.00,
+                 max_speed=9.75,
+                 min_accel=-6.75,
+                 max_accel=6.50,
                  starting_noise=0.5,
+                 traffic_a=0.5,
+                 traffic_b=20,
+                 a_sigma=0.1,
+                 b_sigma=4.0,
                  av_activate=60.0,
                  temporal_res=0.1,
-                 seed=None,
+                 control_lag=0.0,
                  num_avs=1,
                  hv_heterogeneity=False,
                  uncertain_avs=False,
+                 seed=None,
                  ):
         
         # Store properties:
         self.num_vehicles = num_vehicles  # Total number of vehicles (including A.V.).
         self.ring_length = ring_length  # Length of ring road (meters).
-        self.vehicle_length = 4.5  # Length of vehicles (meters).
-        self.safe_distance = 4.0  # Safe distance between vehicles (meters).
-        self.min_speed = 0.00  # Min velocity (meters/second).
-        self.max_speed = 9.75  # Max velocity (meters/second).
-        self.min_accel = -7  # Min acceleration (meters/second^2).
-        self.max_accel = 6.50  # Max acceleration (meters/second^2).
+        self.vehicle_length = vehicle_length  # Length of vehicles (meters).
+        self.safe_distance = safe_distance  # Safe distance between vehicles (meters).
+        self.min_speed = min_speed  # Min velocity (meters/second).
+        self.max_speed = max_speed  # Max velocity (meters/second).
+        self.min_accel = min_accel  # Min acceleration (meters/second^2).
+        self.max_accel = max_accel  # Max acceleration (meters/second^2).
+        self.control_lag = control_lag  # How long between when control is calculated and when it is applied (seconds).
         self.temporal_res = temporal_res  # Time between updates (in seconds).
-        self.spatial_res = None
-        self.traffic_a = 0.5  # Coefficient for the FTL model (meters/second).
-        self.traffic_b = 20  # Coefficient for the Bando-OV model (1/second).
-        self.a_sigma = 0.1  # Std. dev. for 'a' parameter on Bando-FTL model (only for HVs when using HV heterogeneity)
-        self.b_sigma = 4.   # Std. dev. for 'b' parameter on Bando-FTL model (only for HVs when using HV heterogeneity)
+        self.traffic_a = traffic_a  # Coefficient for the FTL model (meters/second).
+        self.traffic_b = traffic_b  # Coefficient for the Bando-OV model (1/second).
+        self.a_sigma = a_sigma  # Std. dev. for 'a' parameter on Bando-FTL model (only for HVs when using HV heterogeneity)
+        self.b_sigma = b_sigma  # Std. dev. for 'b' parameter on Bando-FTL model (only for HVs when using HV heterogeneity)
         self.av_activate = av_activate  # When to activate AV controller (seconds).
         self.starting_noise = starting_noise  # Add noise (in meters) to starting positions.
         self.seed = seed
