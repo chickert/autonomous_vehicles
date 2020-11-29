@@ -117,10 +117,9 @@ class PID(Controller):
 
     def calc_beta(self):
         """
-        Currently unclear on how to calc this
+        Determines how rapidly the controller adjusts to new situations
         """
-        warnings.warn("TODO: Calculate beta.")
-        return 1.0  # Arbitrary test value.
+        return 1.0
 
     def calc_desired_velocity(self, velocity_history):
         """

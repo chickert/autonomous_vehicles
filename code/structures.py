@@ -125,6 +125,7 @@ class RingRoad:
                  num_avs=1,
                  hv_heterogeneity=False,
                  uncertain_avs=False,
+                 sigma_pct=0.2,
                  seed=None,
                  ):
         
@@ -146,9 +147,10 @@ class RingRoad:
         self.av_activate = av_activate  # When to activate AV controller (seconds).
         self.starting_noise = starting_noise  # Add noise (in meters) to starting positions.
         self.seed = seed
-        self.num_avs = num_avs      # Number of AVs
-        self.hv_heterogeneity = hv_heterogeneity    # Set to True for heterogeneity in HVs
-        self.uncertain_avs=uncertain_avs            # Set to True for uncertainty in AVs
+        self.num_avs = num_avs  # Number of AVs
+        self.hv_heterogeneity = hv_heterogeneity  # Set to True for heterogeneity in HVs
+        self.uncertain_avs = uncertain_avs  # Set to True for uncertainty in AVs
+        self.sigma_pct = sigma_pct  # Tunes amount of uncertainty to add if uncertain_avs=True
 
         # Store state information:
         self.state = None
@@ -214,7 +216,7 @@ class RingRoad:
             noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
             robot = Robot(
                 env=self,
-                active_controller = PID(env=self, safe_distance=self.safe_distance, gamma=2.0, m=38, is_uncertain=self.uncertain_avs),
+                active_controller = PID(env=self, safe_distance=self.safe_distance, gamma=2.0, m=38, is_uncertain=self.uncertain_avs, sigma_pct=self.sigma_pct),
                 passive_controller = BandoFTL(env=self, a=self.traffic_a, b=self.traffic_b),
                 init_pos = index * d_start + noise,
                 init_vel = 0.0,
