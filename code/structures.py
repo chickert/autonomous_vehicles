@@ -236,11 +236,15 @@ class RingRoad:
             noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
             a_noise = random.gauss(mu=0, sigma=self.a_sigma)     # Noise on Bando-FTL a parameter
             b_noise = random.gauss(mu=0, sigma=self.b_sigma)      # Noise on Bando-FTL b parameter
+            uncertain_a = self.traffic_a + a_noise # if self.traffic_a + a_noise > 0 else 0.1
+            # uncertain_a = min(uncertain_a, 0.5)
+            uncertain_b = self.traffic_b + b_noise # if self.traffic_b + b_noise > 0 else 4.0
+            # uncertain_b = min(uncertain_b, 20.)
             human = Human(
                 env=self,
                 controller = BandoFTL(env=self,
-                                      a=(self.traffic_a + a_noise) if self.hv_heterogeneity else self.traffic_a,
-                                      b=(self.traffic_b + b_noise) if self.hv_heterogeneity else self.traffic_b,
+                                      a=uncertain_a if self.hv_heterogeneity else self.traffic_a,
+                                      b=uncertain_b if self.hv_heterogeneity else self.traffic_b,
                                       ),
                 init_pos = index * d_start + noise,
                 init_vel = 0.0,
@@ -351,12 +355,13 @@ class RingRoad:
             lead_vehicle = vehicles[(j+1)%self.N]
             this_index = self.get_vehicle_index(this_vehicle)
             lead_index = self.get_vehicle_index(lead_vehicle)
-            if (this_index+1) % self.N != lead_index:
-                raise RuntimeError("Illegal passing occured at step={} around index {} : {}".format(
-                    self.step,
-                    this_index,
-                    this_vehicle, #this_vehicle.__repr__(),
-                ))
+            if not self.hv_heterogeneity:
+                if (this_index+1) % self.N != lead_index:
+                    raise RuntimeError("Illegal passing occured at step={} around index {} : {}".format(
+                        self.step,
+                        this_index,
+                        this_vehicle, #this_vehicle.__repr__(),
+                    ))
             # Check safety distance:
             if this_vehicle.distance_to(lead_vehicle) - lead_vehicle.length < self.safe_distance:
                 warning = "WARNING: Safe distance violation at step {}:".format(self.step)
@@ -424,8 +429,8 @@ class RingRoad:
         car_width = 3.
         point_car_size = 6.
         road_color = 'silver'
-        hv_color = 'firebrick'
-        av_color = 'seagreen'
+        hv_color = '#386cb0'
+        av_color = '#33a02c'
 
         # Create axes (or use existing ones):
         if ax:
@@ -480,7 +485,7 @@ class RingRoad:
                 # Draw safety zone behind car:
                 if draw_safety_buffer:
                     car_polar_buffer = (2*np.pi) * self.safe_distance / self.ring_length
-                    car_buffer = plt.Rectangle(xy=(car_theta-car_polar_length-car_polar_buffer, road_radius-car_width/2), width=car_polar_buffer, height=car_width, lw=0, color='gold', zorder=car_zorder-0.1, alpha=0.4, fill=True)
+                    car_buffer = plt.Rectangle(xy=(car_theta-car_polar_length-car_polar_buffer, road_radius-car_width/2), width=car_polar_buffer, height=car_width, lw=0, color='#fb6a4a', zorder=car_zorder-0.1, alpha=0.4, fill=True)
                     ax.add_artist(car_buffer)
                     artists.append(car_buffer)
 
@@ -499,8 +504,8 @@ class RingRoad:
         # Add text:
         if label_step:
             step_label = "t = {:.1f} s".format(state['time'])
-            if label_cars:
-                step_label = " \n\n"+step_label+"\n\n"+"A.V. = 0"
+            # if label_cars:
+            #     step_label = " \n\n"+step_label+"\n\n"+"A.V. = 0"
             label = ax.text(0,0, step_label, fontsize=14, ha='center', va='center')
             artists.append(label)
         
@@ -526,8 +531,8 @@ class RingRoad:
         """
         
         # Set plotting options:
-        hv_color = 'firebrick'
-        av_color = 'seagreen'
+        hv_color = '#386cb0'
+        av_color = '#7fc97f'
         
         # Create axes (or use existing ones):
         if ax:
@@ -607,8 +612,8 @@ class RingRoad:
         """
         
         # Set plotting options:
-        hv_color = 'firebrick'
-        av_color = 'seagreen'
+        hv_color = '#386cb0'
+        av_color = '#33a02c'
         
         # Create axes (or use existing ones):
         if ax:
