@@ -83,12 +83,12 @@ def extension_two(a_sigma_start, a_sigma_stop, a_sigma_granularity, b_sigma_star
             sys_var_buffer = []
             if counter % 10 == 0:
                 print(f"On combintion #{counter}")
-            for seed in range(1):
+            for seed in range(3):
                 # Define the env with the selected a_sigma and b_sigma values, and with hv_heterogeneity set to True
                 env = RingRoad(
                     num_vehicles=22,  # The vechicles at index 0 is an A.V.
                     ring_length=230.0,  # The road is a cicle.
-                    starting_noise=0.,  # Uniformly add noise to starting positions.
+                    starting_noise=4.0,  # Uniformly add noise to starting positions.
                     temporal_res=0.3,  # Set the size of simulation steps (seconds).
                     av_activate=30,  # Set when the PID controller is activated.
                     seed=seed,  # Set a random seed.
@@ -205,13 +205,13 @@ def extension_three(max_sigma_pct, granularity):
     plt.show()
 
 
-if __name__ == '__main__':
-    import warnings
-    warnings.filterwarnings("ignore", category=UserWarning)
-    extension_two(a_sigma_start=0.,
-                  a_sigma_stop=2.0,
-                  a_sigma_granularity=0.1,
-                  b_sigma_start=0.,
-                  b_sigma_stop=60.0,
-                  b_sigma_granularity=3.0,
-                  )
+# if __name__ == '__main__':
+#     import warnings
+#     warnings.filterwarnings("ignore", category=UserWarning)
+#     extension_two(a_sigma_start=0.,
+#                   a_sigma_stop=2.0,
+#                   a_sigma_granularity=0.1,
+#                   b_sigma_start=0.,
+#                   b_sigma_stop=60.0,
+#                   b_sigma_granularity=3.0,
+#                   )
