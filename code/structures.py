@@ -198,11 +198,37 @@ class RingRoad:
         return len(self.state['vehicles'])
 
     def __repr__(self):
-        return "RingRoad(num_vehicles={}, ring_length={}, seed={})".format(self.num_vehicles, self.ring_length, self.seed)
+        params_string = []
+        for param in [
+            'num_vehicles',
+            'ring_length',
+            'vehicle_length',
+            'safe_distance',
+            'min_speed',
+            'max_speed',
+            'min_accel',
+            'max_accel',
+            'starting_noise',
+            'traffic_a',
+            'traffic_b',
+            'a_sigma',
+            'b_sigma',
+            'av_activate',
+            'temporal_res',
+            'control_lag',
+            'num_avs',
+            'hv_heterogeneity',
+            'uncertain_avs',
+            'sigma_pct',
+            'seed',
+        ]:
+            params_string.append( f"{param}={getattr(self,param)}" )
+        params_string = ", ".join(params_string)
+        return f"RingRoad({params_string})"
 
     def __str__(self):
         s = ""
-        s += self.__repr__() + " at step {} (t={}):".format(self.step, self.t) + "\n"
+        s += "RingRoad at step {} (t={}) with {} AV and {} HV:".format(self.step, self.t, self.num_avs, self.num_vehicles-self.num_avs) + "\n"
         for index,vehicle in enumerate(self.state['vehicles']):
             s += "  [{}] ".format(index) + vehicle.__str__() + "\n"
         return s
