@@ -193,3 +193,41 @@ class PID(Controller):
         delta_velocity = command_velocity - current_velocity
 
         return delta_velocity
+
+class LearningController(Controller):
+
+    """
+    Controller that waits for an external command (for Q-leaning).
+    """
+
+    def __init__(self, env):
+        super().__init__(env)
+        self.type = 'Q-learning'
+
+        self.env = env
+        self.type = None  # 'BandoFTL' or 'PID', etc
+        self._command = None
+
+    @property
+    def command(self):
+        if self._command is None:
+            raise RuntimeError("No command was set.")
+        return self._command
+
+    @command.setter
+    def command(self, command):
+        if self._command is not None:
+            raise RuntimeError("Command was already set.")
+        self._command = command
+
+    def calculate(self, this_vehicle):
+        """
+        Calculate a velocity update for this vehicle
+        given current state information that can be
+        obtained from this vechicle and/or the environment.
+        """
+        if self._command is None:
+            raise RuntimeError(f"No command was set (vehicle {this_vehicle.id}).")
+        command = self._command
+        self._command = None
+        return command

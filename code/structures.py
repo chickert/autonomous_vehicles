@@ -14,7 +14,7 @@ import pandas as pd
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 
-from controllers import Controller, BandoFTL, PID
+from controllers import Controller, BandoFTL, PID, LearningController
 
 
 class Position:
@@ -127,6 +127,7 @@ class RingRoad:
                  hv_heterogeneity=False,
                  uncertain_avs=False,
                  sigma_pct=0.2,
+                 learning_mode=False,
                  seed=None,
                  ):
         
@@ -153,6 +154,7 @@ class RingRoad:
         self.hv_heterogeneity = hv_heterogeneity  # Set to True for heterogeneity in HVs
         self.uncertain_avs = uncertain_avs  # Set to True for uncertainty in AVs
         self.sigma_pct = sigma_pct  # Tunes amount of uncertainty to add if uncertain_avs=True
+        self.learning_mode = learning_mode  # If True, replaces the AV's PID controller with one that expects external commands.
 
         # Store state information:
         self.state = None
@@ -235,6 +237,7 @@ class RingRoad:
             'hv_heterogeneity',
             'uncertain_avs',
             'sigma_pct',
+            'learning_mode',
             'seed',
         ]:
             params_string.append( f"{param}={getattr(self,param)}" )
@@ -269,9 +272,13 @@ class RingRoad:
             if index in set(av_indices):
                 noise = self.starting_noise
                 noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
+                if self.learning_mode:
+                    active_controller = LearningController(env=self)
+                else:
+                    active_controller = PID(env=self, safe_distance=self.safe_distance, gamma=2.0, m=38, is_uncertain=self.uncertain_avs, sigma_pct=self.sigma_pct)
                 robot = Robot(
                     env=self,
-                    active_controller = PID(env=self, safe_distance=self.safe_distance, gamma=2.0, m=38, is_uncertain=self.uncertain_avs, sigma_pct=self.sigma_pct),
+                    active_controller = active_controller,
                     passive_controller = BandoFTL(env=self, a=self.traffic_a, b=self.traffic_b),
                     init_pos = index * d_start + noise,
                     init_vel = 0.0,
