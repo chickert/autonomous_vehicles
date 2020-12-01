@@ -1,28 +1,36 @@
 # Model under construction
-import gym
 import torch
 import torch.nn.functional as F
 import wandb
 import tqdm
 import numpy as np
-from q_network import Qnetwork
-from agent import Agent
-from replay_memory import SARSD, ReplayMemory
 import random
+
+from dqn.q_network import Qnetwork
+from dqn.agent import Agent
+from dqn.replay_memory import SARSD, ReplayMemory
+from structures import RingRoad
+from animations import Animation
+from learning import Game
+
 
 ##### HYPERPARAMETERS #####
 LAYER_1_NODES = 512
 LAYER_2_NODES = 256
 GAMMA = 0.999
-EPS_DECAY_RATE = 0.999992
+EPS_DECAY_RATE = 0.999985
+# EPS_DECAY_RATE = 0.999980
 LR = 1e-4
 BATCH_SIZE = 256
 NUM_EPISODES = 15_000
-MAX_TIMESTEPS = 400     # max for cartpole is 200, so 400 never interferes in the cartpole case
-REPLAY_MEMORY_SIZE = 500_000
-TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 25_000
+MAX_TIMESTEPS = 200
+REPLAY_MEMORY_SIZE = 20_000
+# REPLAY_MEMORY_SIZE = 50_000
+TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 2_000
+# TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 5_000
+REWARD_SCALING = 1./100.
 SEED = 1
-SAVE_PATH = './run3_trained_model_'
+SAVE_PATH = './testrun_trained_model_'
 #####################
 
 
@@ -71,9 +79,24 @@ def main():
     np.random.seed(SEED)
     random.seed(SEED)
 
+    # Initialize wandb
+    wandb.init(project="cs286", name="test_dqn-avs")
 
-    wandb.init(project="dqn", name="dqn-cartpole")
-    env = gym.make('CartPole-v0')
+    # Define a ring road environment:
+    road_params = {'num_avs': 2,
+                   'av_even_spacing': True,
+                   'num_vehicles': 10,
+                   'ring_length': 100.0,
+                   'starting_noise': 1.0,
+                   'temporal_res': 0.5,
+                   'av_activate': 0,
+                   'seed': 286,
+                   'learning_mode': True}
+    road = RingRoad(**road_params)
+    env = Game(road = road,
+               agent_commands = [-1.0, -0.1, 0.0, 0.1, 1.0],
+               past_steps = 3,
+               max_seconds = None)
 
     replay_memory = ReplayMemory(memory_size=REPLAY_MEMORY_SIZE)
     q_network = Qnetwork(
@@ -114,7 +137,7 @@ def main():
             # also making it easier for network to predict Q-val (for 200-timestep long episode, Q-net
             # should end up predicting "2" rather than "200")
             ith_episode_rewards.append(reward)
-            reward = reward / 100.0
+            reward = reward * REWARD_SCALING
 
             sarsd = SARSD(state=observation,
                           action=action,
@@ -142,12 +165,14 @@ def main():
                 print(f"\tOn overall timestep {agent.current_timestep_number}")
                 print(f"\tReplay memory now has {len(agent.replay_memory.memory)} transitions")
                 agent.target_network.load_state_dict(agent.q_network.state_dict())
-                torch.save(agent.q_network.state_dict(), SAVE_PATH + str(i_episode + 1))
-                print(f'\tModel saved to {SAVE_PATH}')
+                # torch.save(agent.q_network.state_dict(), SAVE_PATH + str(i_episode + 1))
+                # print(f'\tModel saved to {SAVE_PATH}')
 
-    env.close()
+    print("\n****Training Complete****\n")
 
 
 if __name__ == "__main__":
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning)
     main()
 
