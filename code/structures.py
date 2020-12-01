@@ -123,6 +123,7 @@ class RingRoad:
                  temporal_res=0.1,
                  control_lag=0.0,
                  num_avs=1,
+                 av_even_spacing=False,
                  hv_heterogeneity=False,
                  uncertain_avs=False,
                  sigma_pct=0.2,
@@ -148,6 +149,7 @@ class RingRoad:
         self.starting_noise = starting_noise  # Add noise (in meters) to starting positions.
         self.seed = seed
         self.num_avs = num_avs  # Number of AVs
+        self.av_even_spacing = av_even_spacing  # Set to True to spread AVs out, otherwise leave them all in a row.
         self.hv_heterogeneity = hv_heterogeneity  # Set to True for heterogeneity in HVs
         self.uncertain_avs = uncertain_avs  # Set to True for uncertainty in AVs
         self.sigma_pct = sigma_pct  # Tunes amount of uncertainty to add if uncertain_avs=True
@@ -162,6 +164,14 @@ class RingRoad:
         self.gauss_random = random.seed(seed)
         self.reset_state()
         self.archive_state()
+
+    @property
+    def av_indices(self):
+        return self.state['av_indices'].copy()
+
+    @property
+    def hv_indices(self):
+        return self.state['hv_indices'].copy()
 
     @property
     def vehicles(self):
@@ -217,6 +227,7 @@ class RingRoad:
             'temporal_res',
             'control_lag',
             'num_avs',
+            'av_even_spacing',
             'hv_heterogeneity',
             'uncertain_avs',
             'sigma_pct',
@@ -237,7 +248,13 @@ class RingRoad:
         assert self.num_vehicles >= 2, "Need at least 1 human and 1 robot."
         d_start = self.ring_length / self.num_vehicles
         vehicles = []
-        for index in range(self.num_avs):
+        # Build AV and HV index lists:
+        if self.av_even_spacing:
+            av_indices = [int(i/self.num_avs*self.num_vehicles) for i in range(self.num_avs)]
+        else:
+            av_indices = [i for i in range(self.num_avs)]
+        hv_indices = [i for i in range(self.num_vehicles) if i not in set(av_indices)]
+        for index in av_indices:
             noise = self.starting_noise
             noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
             robot = Robot(
@@ -257,7 +274,7 @@ class RingRoad:
             robot.state['index'] = index
             robot.active = (self.av_activate==0)
             vehicles.append(robot)
-        for index in range(self.num_avs, self.num_vehicles):
+        for index in hv_indices:
             noise = self.starting_noise
             noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
             a_noise = random.gauss(mu=0, sigma=self.a_sigma)     # Noise on Bando-FTL a parameter
@@ -292,6 +309,8 @@ class RingRoad:
             'time' : 0.0,
             'vehicles' : vehicles,  # List of vehicles in 0,...,(N-1) index order, with A.V. at index 0.
             'av_active' : robot.active,
+            'av_indices' : av_indices,
+            'hv_indices' : hv_indices,
         }
 
     def copy_state(self):
