@@ -254,53 +254,54 @@ class RingRoad:
         else:
             av_indices = [i for i in range(self.num_avs)]
         hv_indices = [i for i in range(self.num_vehicles) if i not in set(av_indices)]
-        for index in av_indices:
-            noise = self.starting_noise
-            noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
-            robot = Robot(
-                env=self,
-                active_controller = PID(env=self, safe_distance=self.safe_distance, gamma=2.0, m=38, is_uncertain=self.uncertain_avs, sigma_pct=self.sigma_pct),
-                passive_controller = BandoFTL(env=self, a=self.traffic_a, b=self.traffic_b),
-                init_pos = index * d_start + noise,
-                init_vel = 0.0,
-                init_acc = 0.0,
-                length = self.vehicle_length,
-                min_vel = self.min_speed,
-                max_vel = self.max_speed,
-                min_acc = self.min_accel,
-                max_acc = self.max_accel,
-                control_lag = self.control_lag,
-            )
-            robot.state['index'] = index
-            robot.active = (self.av_activate==0)
-            vehicles.append(robot)
-        for index in hv_indices:
-            noise = self.starting_noise
-            noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
-            a_noise = random.gauss(mu=0, sigma=self.a_sigma)     # Noise on Bando-FTL a parameter
-            b_noise = random.gauss(mu=0, sigma=self.b_sigma)      # Noise on Bando-FTL b parameter
-            uncertain_a = self.traffic_a + a_noise # if self.traffic_a + a_noise > 0 else 0.1
-            # uncertain_a = min(uncertain_a, 0.5)
-            uncertain_b = self.traffic_b + b_noise # if self.traffic_b + b_noise > 0 else 4.0
-            # uncertain_b = min(uncertain_b, 20.)
-            human = Human(
-                env=self,
-                controller = BandoFTL(env=self,
-                                      a=uncertain_a if self.hv_heterogeneity else self.traffic_a,
-                                      b=uncertain_b if self.hv_heterogeneity else self.traffic_b,
-                                      ),
-                init_pos = index * d_start + noise,
-                init_vel = 0.0,
-                init_acc = 0.0,
-                length = self.vehicle_length,
-                min_vel = self.min_speed,
-                max_vel = self.max_speed,
-                min_acc = self.min_accel,
-                max_acc = self.max_accel,
-                control_lag = self.control_lag,
-            )
-            human.state['index'] = index
-            vehicles.append(human)
+        for index in range(self.num_vehicles):
+            if index in set(av_indices):
+                noise = self.starting_noise
+                noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
+                robot = Robot(
+                    env=self,
+                    active_controller = PID(env=self, safe_distance=self.safe_distance, gamma=2.0, m=38, is_uncertain=self.uncertain_avs, sigma_pct=self.sigma_pct),
+                    passive_controller = BandoFTL(env=self, a=self.traffic_a, b=self.traffic_b),
+                    init_pos = index * d_start + noise,
+                    init_vel = 0.0,
+                    init_acc = 0.0,
+                    length = self.vehicle_length,
+                    min_vel = self.min_speed,
+                    max_vel = self.max_speed,
+                    min_acc = self.min_accel,
+                    max_acc = self.max_accel,
+                    control_lag = self.control_lag,
+                )
+                robot.state['index'] = index
+                robot.active = (self.av_activate==0)
+                vehicles.append(robot)
+            elif index in set(hv_indices):
+                noise = self.starting_noise
+                noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
+                a_noise = random.gauss(mu=0, sigma=self.a_sigma)     # Noise on Bando-FTL a parameter
+                b_noise = random.gauss(mu=0, sigma=self.b_sigma)      # Noise on Bando-FTL b parameter
+                uncertain_a = self.traffic_a + a_noise # if self.traffic_a + a_noise > 0 else 0.1
+                # uncertain_a = min(uncertain_a, 0.5)
+                uncertain_b = self.traffic_b + b_noise # if self.traffic_b + b_noise > 0 else 4.0
+                # uncertain_b = min(uncertain_b, 20.)
+                human = Human(
+                    env=self,
+                    controller = BandoFTL(env=self,
+                                        a=uncertain_a if self.hv_heterogeneity else self.traffic_a,
+                                        b=uncertain_b if self.hv_heterogeneity else self.traffic_b,
+                                        ),
+                    init_pos = index * d_start + noise,
+                    init_vel = 0.0,
+                    init_acc = 0.0,
+                    length = self.vehicle_length,
+                    min_vel = self.min_speed,
+                    max_vel = self.max_speed,
+                    min_acc = self.min_accel,
+                    max_acc = self.max_accel,
+                    control_lag = self.control_lag,
+                )
+                human.state['index'] = index
+                vehicles.append(human)
         for vehicle in vehicles:
             # Add vehicle:
             self.all_vehicles.add(vehicle)
