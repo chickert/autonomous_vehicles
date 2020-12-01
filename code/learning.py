@@ -68,6 +68,8 @@ class Game:
             array = np.vstack([padding,array])
         # Flatten observations to a vector:
         vector = array.flatten()
+        # Normalize:
+        vector = vector / self.road.L
         return vector
 
     def reward(self):
