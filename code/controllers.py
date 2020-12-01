@@ -102,10 +102,8 @@ class PID(Controller):
         self.safe_distance = safe_distance
         self.gamma = gamma
 
-        self.stored_command_velocity = None
         self.m = m
         self.temporal_res = temporal_res
-        self.stored_velocities = []
 
         self.is_uncertain = is_uncertain    # whether or not to include noise in calculation
         self.sigma_pct = sigma_pct   # tunes amount of uncertainty to add if is_uncertain=True
@@ -126,7 +124,11 @@ class PID(Controller):
         Calculates desired velocity
         """
         sliding_window = int(self.m * (1/self.temporal_res))
-        v_d = np.mean(velocity_history[-sliding_window:])
+        velocity_history = velocity_history[-sliding_window:]
+        if len(velocity_history)==0:
+            v_d = 0.0  # Placeholder value if there is no history.
+        else:
+            v_d = np.mean(velocity_history)
 
         return v_d
 
@@ -180,8 +182,10 @@ class PID(Controller):
         # Get command history (by adding unconstrained control to the velocity it was calculated from):
         if len(state_history['vel'])>=2:
             last_commanded_velocity = state_history['control'].iloc[-1] + state_history['vel'].iloc[-2]
-        else:
+        if len(state_history['vel'])==1:
             last_commanded_velocity = state_history['control'].iloc[-1]
+        else:
+            last_commanded_velocity = 1.0  # Placeholder (avoid division by zero).
 
         # Calculate command velocity and return control:
         command_velocity = self.update_command_velocity(delta_x, velocity_history, last_commanded_velocity, lead_vehicle_velocity)
