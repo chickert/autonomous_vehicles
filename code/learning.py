@@ -5,6 +5,7 @@ Wrapper classes for formulating a reinforcement learning problem.
 import itertools
 
 import numpy as np
+import random
 
 from structures import RingRoad
 
@@ -52,6 +53,16 @@ class Game:
         dummy_observation = self.build_observation()
         self.observation_space = np.zeros(dummy_observation.shape)
 
+        # Taking a 'step' here simply places the vehicles at their starting locations.
+        # Apply A.V. commands (if A.V.s are in autonomous mode):
+        av_commands = np.zeros(len(self.road.av_indices))
+        if self.road.t >= self.road.av_activate:
+            for av_index, av_command in zip(self.road.av_indices, av_commands):
+                av = self.road.vehicles[av_index]
+                av.controller.command = av_command
+        self.road.run_step()
+        return self.build_observation()
+
     def build_observation(self):
         """
         Build an observation vector from the ring road's current state.
@@ -62,12 +73,15 @@ class Game:
         # Get position history for all vehicles:
         table = self.road.get_vehicle_pos_table(steps=steps)
         # Convert to array and pad it with zeros if needed:
-        array = array = table.to_numpy()  # Cols are vehicles, rows are time steps.
+        array = table.to_numpy()  # Cols are vehicles, rows are time steps.
         if array.shape[0] < past_steps:
             padding = np.zeros( (past_steps-array.shape[0], array.shape[1]) )
             array = np.vstack([padding,array])
         # Flatten observations to a vector:
         vector = array.flatten()
+        # Normalize:
+        vector = vector / self.road.L
+        vector = vector.astype(np.float64)
         return vector
 
     def reward(self):
@@ -131,7 +145,7 @@ class Game:
 
 class ObservationSpace:
     """
-    A wraper that calculates and caches the shape of the observation space
+    A wrapper that calculates and caches the shape of the observation space
     by getting a dummy observation from the environment. The lazy evaluation
     ensures that it is not called until after the Game has been initialized.
     """
@@ -150,7 +164,7 @@ class ObservationSpace:
 
 class ActionSpace:
     """
-    A wraper that stores the state of the action space.
+    A wrapper that stores the state of the action space and allows for sampling.
     """
 
     def __init__(self, game):
@@ -184,3 +198,11 @@ class ActionSpace:
         """
         self._check_build()
         return self.actions[action_index]
+
+    def sample(self):
+        """
+        Randomly samples an action
+        """
+        action = np.random.choice(range(self.n))
+        return action
+

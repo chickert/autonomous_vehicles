@@ -494,8 +494,8 @@ class RingRoad:
 
         # Make sure there has been no illegal passing or tailgaiting.
         # Note: `vehicle=None` checks all vehicles.
-        raise_crash_error = False if self.hv_heterogeneity else True
-        raise_crowding_warning = True
+        raise_crash_error = False if self.hv_heterogeneity or self.learning_mode else True
+        raise_crowding_warning = False if self.learning_mode else True
         self.check_crash(vehicle=None, raise_error=raise_crash_error)
         self.check_crowding(vehicle=None, raise_warning=raise_crowding_warning, pct=0.5)
 
