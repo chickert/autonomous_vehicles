@@ -1,0 +1,25 @@
+name: dqn
+
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.7
+  - ipdb
+  - ipykernel
+  - ipython
+  - matplotlib
+  - numpy
+  - pandas
+  - pip
+  - pylint
+  - scipy
+  - tqdm
+  - wandb
+  - gym  # OpenAI gym (for DQN demo).
+  - pytorch # Pytorch (for Deep Q-learning Network)
+  - torchvision
+  - torchaudio
+  #- cudatoolkit=10.2  # pytorch with GPU.
+  - cpuonly  # pytorch without GPU.
