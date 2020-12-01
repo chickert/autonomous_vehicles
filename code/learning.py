@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 class Game:
 
-    def __init__(self, road, past_steps=3, max_seconds=None):
+    def __init__(self, road, past_steps=3, agent_commands=[-2,-1,0,1,2], max_seconds=None):
         
         # Bind RingRoad object to Game:
         self.road = road
@@ -28,7 +28,7 @@ class Game:
         self.max_steps = None if max_seconds is None else int(np.ciel( self.max_seconds / self.road.dt ))
         self.observation_space = ObservationSpace(self)  # Simple wrapper object defined below.
         self.action_space = ActionSpace(self)  # Simple wrapper object defined below.
-        self.agent_actions = [-2,-1,0,1,2]  # List of valid commands for each A.V.
+        self.agent_commands = agent_commands  # List of valid commands for each A.V.
         self.num_agents = self.road.num_avs  # Number of A.V.s being controlled.
         self.past_steps = past_steps  # How many steps into the past to include in observation.
 
@@ -159,7 +159,7 @@ class ActionSpace:
 
     def _check_build(self):
         if self.actions is None:
-            self.actions = itertools.product(self.game.agent_actions, repeat=self.game.num_agents)
+            self.actions = itertools.product(self.game.agent_commands, repeat=self.game.num_agents)
             self.actions = list(self.actions)  # List of tuples.
 
     def __call__(self):
@@ -171,12 +171,12 @@ class ActionSpace:
         self._check_build()
         return len(self.actions)
 
-    def encode(self, agent_actions):
+    def encode(self, agent_commands):
         """
         Convert a tuple of agent commands into a positional index in the RL action space.
         """
         self._check_build()
-        return self.actions.index(tuple(agent_actions))
+        return self.actions.index(tuple(agent_commands))
 
     def decode(self, action_index):
         """
