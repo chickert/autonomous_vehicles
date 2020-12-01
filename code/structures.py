@@ -248,6 +248,13 @@ class RingRoad:
             s += "  [{}] ".format(index) + vehicle.__str__() + "\n"
         return s
 
+    def reset_road(self):
+        #self.random = np.random.RandomState(seed)
+        self.history = dict()
+        self.all_vehicles = set()
+        self.reset_state()
+        self.archive_state()
+
     def reset_state(self):
         assert self.num_vehicles >= 2, "Need at least 1 human and 1 robot."
         d_start = self.ring_length / self.num_vehicles
