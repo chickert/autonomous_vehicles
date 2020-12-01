@@ -178,6 +178,10 @@ class RingRoad:
         return self.state['vehicles'].copy()
 
     @property
+    def queue(self):
+        return self.state['queue'].copy()
+
+    @property
     def step(self):
         try:
             return self.state['step']
@@ -302,13 +306,20 @@ class RingRoad:
                 )
                 human.state['index'] = index
                 vehicles.append(human)
+        # Add vehicles to list:
         for vehicle in vehicles:
             # Add vehicle:
             self.all_vehicles.add(vehicle)
+        # Build list of vehicle indices in increasing order of position, starting at x=0.
+        # Note: Unless (illegal) passing has occurred, this should just be an offset list of ordered indices.
+        queue = sorted(vehicles, key=lambda vehicle: vehicle.pos.x)
+        queue = [vehicle.state['index'] for vehicle in queue]
+        # Build state dictionaryL
         self.state = {
             'step' : 0,
             'time' : 0.0,
             'vehicles' : vehicles,  # List of vehicles in 0,...,(N-1) index order, with A.V. at index 0.
+            'queue' : queue,  # List of vehicle indices in increasing order of position (starting at x=0).
             'av_active' : robot.active,
             'av_indices' : av_indices,
             'hv_indices' : hv_indices,
@@ -379,7 +390,10 @@ class RingRoad:
             raise RuntimeError("Vehicle not found: {}".format(vehicle))
         if self.N < 2:
             raise RuntimeError("Vehicle is alone on the road: {}".format(vehicle))
-        lead_index = (this_index + 1) % self.N
+        # Find index of vehicle just ahead of this one in the queue:
+        this_pos = self.state['queue'].index(this_index)
+        lead_pos = (this_pos + 1) % len(self.state['queue'])
+        lead_index = self.state['queue'][lead_pos]
         return lead_index
 
     def get_lead_vehicle(self, vehicle):
@@ -387,36 +401,55 @@ class RingRoad:
         lead_vehicle = self.state['vehicles'][lead_index]
         return lead_vehicle
 
-    def check(self):
+    def check_crash(self, vehicle=None, raise_error=False):
         """
-        Makes sure no vehicles have passed another or gotten too close.
+        Check if a vehicle has crashed into or passed through the vehicle in front of it.
+        If no vehicle is specified, then all vehicles are checked.
         """
 
-        # Sort vehicles in order of actual position (regardless of index):
-        vehicles = sorted(self.vehicles, key=lambda vehicle: vehicle.pos.x)
+        # Build list of vechicles to check:
+        vehicles = self.vehicles if vehicle is None else [vehicle]
 
-        # Loop through vehicles to check that they are also in index order:
-        for j in range(len(vehicles)):
-            this_vehicle = vehicles[j]
-            lead_vehicle = vehicles[(j+1)%self.N]
+        # Loop through vehicles:
+        for this_vehicle in vehicles:
+            # Check that the lead vehicle has the expected index:
+            lead_vehicle = self.get_lead_vehicle(this_vehicle)
             this_index = self.get_vehicle_index(this_vehicle)
             lead_index = self.get_vehicle_index(lead_vehicle)
-            if not self.hv_heterogeneity:
-                if (this_index+1) % self.N != lead_index:
+            if (this_index+1) % self.N != lead_index:
+                if raise_error:
                     raise RuntimeError("Illegal passing occured at step={} around index {} : {}".format(
                         self.step,
                         this_index,
                         this_vehicle, #this_vehicle.__repr__(),
                     ))
+                return True
+        return False
+
+    def check_crowding(self, vehicle=None, pct=1.0, raise_warning=False):
+        """
+        Check if a vehicle has gotten within the safety buffer of the one in front of it (or withing a specified percentage of it).
+        If no vehicle is specified, then all vehicles are checked.
+        """
+
+        # Build list of vechicles to check:
+        vehicles = self.vehicles if vehicle is None else [vehicle]
+
+        # Loop through vehicles:
+        for this_vehicle in vehicles:
+            # Get lead vehicle:
+            lead_vehicle = self.get_lead_vehicle(this_vehicle)
             # Check safety distance:
-            if this_vehicle.distance_to(lead_vehicle) - lead_vehicle.length < self.safe_distance:
-                warning = "WARNING: Safe distance violation at step {}:".format(self.step)
-                warning += "  [{}] {}".format(this_index,this_vehicle)
-                warning += "  [{}] {}".format(lead_index,lead_vehicle)
-                warnings.warn(warning)
-            # Store values for next iteration:
-            lead_vehicle = this_vehicle
-            lead_index = this_index
+            safe_distance = pct * self.safe_distance
+            if this_vehicle.distance_to(lead_vehicle) - lead_vehicle.length < safe_distance:
+                if raise_warning:
+                    warning = "WARNING: Safe distance violation at step {}:".format(self.step)
+                    warning += "  [{}] {}".format(self.get_vehicle_index(this_vehicle),this_vehicle)
+                    warning += "  [{}] {}".format(self.get_vehicle_index(lead_vehicle),lead_vehicle)
+                    warnings.warn(warning)
+                return True
+        
+        return False
 
     def run_step(self):
         """
@@ -440,8 +473,17 @@ class RingRoad:
             vehicle.vel += vehicle.acc*self.dt  # Apply acceleration (with constraints on acc and vel).
             vehicle.pos += vehicle.vel*self.dt
 
+        # Update vehicle queue (list of vehicle indices in the order they are encountered on the right when starting from x=0):
+        queue = sorted(self.vehicles, key=lambda vehicle: vehicle.pos.x)
+        queue = [vehicle.state['index'] for vehicle in queue]
+        self.state['queue'] = queue
+
         # Make sure there has been no illegal passing or tailgaiting.
-        self.check()
+        # Note: `vehicle=None` checks all vehicles.
+        raise_crash_error = False if self.hv_heterogeneity else True
+        raise_crowding_warning = True
+        self.check_crash(vehicle=None, raise_error=raise_crash_error)
+        self.check_crowding(vehicle=None, raise_warning=raise_crowding_warning, pct=0.5)
 
         # Increment time step for next iteration:
         self.state['step'] += 1
