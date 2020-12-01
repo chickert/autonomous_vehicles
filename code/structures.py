@@ -14,7 +14,7 @@ import pandas as pd
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 
-from controllers import Controller, BandoFTL, PID
+from controllers import Controller, BandoFTL, PID, LearningController
 
 
 class Position:
@@ -123,9 +123,11 @@ class RingRoad:
                  temporal_res=0.1,
                  control_lag=0.0,
                  num_avs=1,
+                 av_even_spacing=False,
                  hv_heterogeneity=False,
                  uncertain_avs=False,
                  sigma_pct=0.2,
+                 learning_mode=False,
                  seed=None,
                  ):
         
@@ -148,9 +150,11 @@ class RingRoad:
         self.starting_noise = starting_noise  # Add noise (in meters) to starting positions.
         self.seed = seed
         self.num_avs = num_avs  # Number of AVs
+        self.av_even_spacing = av_even_spacing  # Set to True to spread AVs out, otherwise leave them all in a row.
         self.hv_heterogeneity = hv_heterogeneity  # Set to True for heterogeneity in HVs
         self.uncertain_avs = uncertain_avs  # Set to True for uncertainty in AVs
         self.sigma_pct = sigma_pct  # Tunes amount of uncertainty to add if uncertain_avs=True
+        self.learning_mode = learning_mode  # If True, replaces the AV's PID controller with one that expects external commands.
 
         # Store state information:
         self.state = None
@@ -164,8 +168,20 @@ class RingRoad:
         self.archive_state()
 
     @property
+    def av_indices(self):
+        return self.state['av_indices'].copy()
+
+    @property
+    def hv_indices(self):
+        return self.state['hv_indices'].copy()
+
+    @property
     def vehicles(self):
         return self.state['vehicles'].copy()
+
+    @property
+    def queue(self):
+        return self.state['queue'].copy()
 
     @property
     def step(self):
@@ -217,9 +233,11 @@ class RingRoad:
             'temporal_res',
             'control_lag',
             'num_avs',
+            'av_even_spacing',
             'hv_heterogeneity',
             'uncertain_avs',
             'sigma_pct',
+            'learning_mode',
             'seed',
         ]:
             params_string.append( f"{param}={getattr(self,param)}" )
@@ -233,65 +251,92 @@ class RingRoad:
             s += "  [{}] ".format(index) + vehicle.__str__() + "\n"
         return s
 
+    def reset_road(self):
+        #self.random = np.random.RandomState(seed)
+        self.history = dict()
+        self.all_vehicles = set()
+        self.reset_state()
+        self.archive_state()
+
     def reset_state(self):
         assert self.num_vehicles >= 2, "Need at least 1 human and 1 robot."
         d_start = self.ring_length / self.num_vehicles
         vehicles = []
-        for index in range(self.num_avs):
-            noise = self.starting_noise
-            noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
-            robot = Robot(
-                env=self,
-                active_controller = PID(env=self, safe_distance=self.safe_distance, gamma=2.0, m=38, is_uncertain=self.uncertain_avs, sigma_pct=self.sigma_pct),
-                passive_controller = BandoFTL(env=self, a=self.traffic_a, b=self.traffic_b),
-                init_pos = index * d_start + noise,
-                init_vel = 0.0,
-                init_acc = 0.0,
-                length = self.vehicle_length,
-                min_vel = self.min_speed,
-                max_vel = self.max_speed,
-                min_acc = self.min_accel,
-                max_acc = self.max_accel,
-                control_lag = self.control_lag,
-            )
-            robot.state['index'] = index
-            robot.active = (self.av_activate==0)
-            vehicles.append(robot)
-        for index in range(self.num_avs, self.num_vehicles):
-            noise = self.starting_noise
-            noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
-            a_noise = random.gauss(mu=0, sigma=self.a_sigma)     # Noise on Bando-FTL a parameter
-            b_noise = random.gauss(mu=0, sigma=self.b_sigma)      # Noise on Bando-FTL b parameter
-            uncertain_a = self.traffic_a + a_noise # if self.traffic_a + a_noise > 0 else 0.1
-            # uncertain_a = min(uncertain_a, 0.5)
-            uncertain_b = self.traffic_b + b_noise # if self.traffic_b + b_noise > 0 else 4.0
-            # uncertain_b = min(uncertain_b, 20.)
-            human = Human(
-                env=self,
-                controller = BandoFTL(env=self,
-                                      a=uncertain_a if self.hv_heterogeneity else self.traffic_a,
-                                      b=uncertain_b if self.hv_heterogeneity else self.traffic_b,
-                                      ),
-                init_pos = index * d_start + noise,
-                init_vel = 0.0,
-                init_acc = 0.0,
-                length = self.vehicle_length,
-                min_vel = self.min_speed,
-                max_vel = self.max_speed,
-                min_acc = self.min_accel,
-                max_acc = self.max_accel,
-                control_lag = self.control_lag,
-            )
-            human.state['index'] = index
-            vehicles.append(human)
+        # Build AV and HV index lists:
+        if self.av_even_spacing:
+            av_indices = [int(i/self.num_avs*self.num_vehicles) for i in range(self.num_avs)]
+        else:
+            av_indices = [i for i in range(self.num_avs)]
+        hv_indices = [i for i in range(self.num_vehicles) if i not in set(av_indices)]
+        for index in range(self.num_vehicles):
+            if index in set(av_indices):
+                noise = self.starting_noise
+                noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
+                if self.learning_mode:
+                    active_controller = LearningController(env=self)
+                else:
+                    active_controller = PID(env=self, safe_distance=self.safe_distance, gamma=2.0, m=38, is_uncertain=self.uncertain_avs, sigma_pct=self.sigma_pct)
+                robot = Robot(
+                    env=self,
+                    active_controller = active_controller,
+                    passive_controller = BandoFTL(env=self, a=self.traffic_a, b=self.traffic_b),
+                    init_pos = index * d_start + noise,
+                    init_vel = 0.0,
+                    init_acc = 0.0,
+                    length = self.vehicle_length,
+                    min_vel = self.min_speed,
+                    max_vel = self.max_speed,
+                    min_acc = self.min_accel,
+                    max_acc = self.max_accel,
+                    control_lag = self.control_lag,
+                )
+                robot.state['index'] = index
+                robot.active = (self.av_activate==0)
+                vehicles.append(robot)
+            elif index in set(hv_indices):
+                noise = self.starting_noise
+                noise = self.random.uniform(-noise/2,noise/2)  # 1 centimeter.
+                a_noise = random.gauss(mu=0, sigma=self.a_sigma)     # Noise on Bando-FTL a parameter
+                b_noise = random.gauss(mu=0, sigma=self.b_sigma)      # Noise on Bando-FTL b parameter
+                uncertain_a = self.traffic_a + a_noise # if self.traffic_a + a_noise > 0 else 0.1
+                # uncertain_a = min(uncertain_a, 0.5)
+                uncertain_b = self.traffic_b + b_noise # if self.traffic_b + b_noise > 0 else 4.0
+                # uncertain_b = min(uncertain_b, 20.)
+                human = Human(
+                    env=self,
+                    controller = BandoFTL(env=self,
+                                        a=uncertain_a if self.hv_heterogeneity else self.traffic_a,
+                                        b=uncertain_b if self.hv_heterogeneity else self.traffic_b,
+                                        ),
+                    init_pos = index * d_start + noise,
+                    init_vel = 0.0,
+                    init_acc = 0.0,
+                    length = self.vehicle_length,
+                    min_vel = self.min_speed,
+                    max_vel = self.max_speed,
+                    min_acc = self.min_accel,
+                    max_acc = self.max_accel,
+                    control_lag = self.control_lag,
+                )
+                human.state['index'] = index
+                vehicles.append(human)
+        # Add vehicles to list:
         for vehicle in vehicles:
             # Add vehicle:
             self.all_vehicles.add(vehicle)
+        # Build list of vehicle indices in increasing order of position, starting at x=0.
+        # Note: Unless (illegal) passing has occurred, this should just be an offset list of ordered indices.
+        queue = sorted(vehicles, key=lambda vehicle: vehicle.pos.x)
+        queue = [vehicle.state['index'] for vehicle in queue]
+        # Build state dictionaryL
         self.state = {
             'step' : 0,
             'time' : 0.0,
             'vehicles' : vehicles,  # List of vehicles in 0,...,(N-1) index order, with A.V. at index 0.
+            'queue' : queue,  # List of vehicle indices in increasing order of position (starting at x=0).
             'av_active' : robot.active,
+            'av_indices' : av_indices,
+            'hv_indices' : hv_indices,
         }
 
     def copy_state(self):
@@ -359,7 +404,10 @@ class RingRoad:
             raise RuntimeError("Vehicle not found: {}".format(vehicle))
         if self.N < 2:
             raise RuntimeError("Vehicle is alone on the road: {}".format(vehicle))
-        lead_index = (this_index + 1) % self.N
+        # Find index of vehicle just ahead of this one in the queue:
+        this_pos = self.state['queue'].index(this_index)
+        lead_pos = (this_pos + 1) % len(self.state['queue'])
+        lead_index = self.state['queue'][lead_pos]
         return lead_index
 
     def get_lead_vehicle(self, vehicle):
@@ -367,36 +415,55 @@ class RingRoad:
         lead_vehicle = self.state['vehicles'][lead_index]
         return lead_vehicle
 
-    def check(self):
+    def check_crash(self, vehicle=None, raise_error=False):
         """
-        Makes sure no vehicles have passed another or gotten too close.
+        Check if a vehicle has crashed into or passed through the vehicle in front of it.
+        If no vehicle is specified, then all vehicles are checked.
         """
 
-        # Sort vehicles in order of actual position (regardless of index):
-        vehicles = sorted(self.vehicles, key=lambda vehicle: vehicle.pos.x)
+        # Build list of vechicles to check:
+        vehicles = self.vehicles if vehicle is None else [vehicle]
 
-        # Loop through vehicles to check that they are also in index order:
-        for j in range(len(vehicles)):
-            this_vehicle = vehicles[j]
-            lead_vehicle = vehicles[(j+1)%self.N]
+        # Loop through vehicles:
+        for this_vehicle in vehicles:
+            # Check that the lead vehicle has the expected index:
+            lead_vehicle = self.get_lead_vehicle(this_vehicle)
             this_index = self.get_vehicle_index(this_vehicle)
             lead_index = self.get_vehicle_index(lead_vehicle)
-            if not self.hv_heterogeneity:
-                if (this_index+1) % self.N != lead_index:
+            if (this_index+1) % self.N != lead_index:
+                if raise_error:
                     raise RuntimeError("Illegal passing occured at step={} around index {} : {}".format(
                         self.step,
                         this_index,
                         this_vehicle, #this_vehicle.__repr__(),
                     ))
+                return True
+        return False
+
+    def check_crowding(self, vehicle=None, pct=1.0, raise_warning=False):
+        """
+        Check if a vehicle has gotten within the safety buffer of the one in front of it (or withing a specified percentage of it).
+        If no vehicle is specified, then all vehicles are checked.
+        """
+
+        # Build list of vechicles to check:
+        vehicles = self.vehicles if vehicle is None else [vehicle]
+
+        # Loop through vehicles:
+        for this_vehicle in vehicles:
+            # Get lead vehicle:
+            lead_vehicle = self.get_lead_vehicle(this_vehicle)
             # Check safety distance:
-            if this_vehicle.distance_to(lead_vehicle) - lead_vehicle.length < self.safe_distance:
-                warning = "WARNING: Safe distance violation at step {}:".format(self.step)
-                warning += "  [{}] {}".format(this_index,this_vehicle)
-                warning += "  [{}] {}".format(lead_index,lead_vehicle)
-                warnings.warn(warning)
-            # Store values for next iteration:
-            lead_vehicle = this_vehicle
-            lead_index = this_index
+            safe_distance = pct * self.safe_distance
+            if this_vehicle.distance_to(lead_vehicle) - lead_vehicle.length < safe_distance:
+                if raise_warning:
+                    warning = "WARNING: Safe distance violation at step {}:".format(self.step)
+                    warning += "  [{}] {}".format(self.get_vehicle_index(this_vehicle),this_vehicle)
+                    warning += "  [{}] {}".format(self.get_vehicle_index(lead_vehicle),lead_vehicle)
+                    warnings.warn(warning)
+                return True
+        
+        return False
 
     def run_step(self):
         """
@@ -420,8 +487,17 @@ class RingRoad:
             vehicle.vel += vehicle.acc*self.dt  # Apply acceleration (with constraints on acc and vel).
             vehicle.pos += vehicle.vel*self.dt
 
+        # Update vehicle queue (list of vehicle indices in the order they are encountered on the right when starting from x=0):
+        queue = sorted(self.vehicles, key=lambda vehicle: vehicle.pos.x)
+        queue = [vehicle.state['index'] for vehicle in queue]
+        self.state['queue'] = queue
+
         # Make sure there has been no illegal passing or tailgaiting.
-        self.check()
+        # Note: `vehicle=None` checks all vehicles.
+        raise_crash_error = False if self.hv_heterogeneity else True
+        raise_crowding_warning = True
+        self.check_crash(vehicle=None, raise_error=raise_crash_error)
+        self.check_crowding(vehicle=None, raise_warning=raise_crowding_warning, pct=0.5)
 
         # Increment time step for next iteration:
         self.state['step'] += 1
