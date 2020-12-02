@@ -1,9 +1,15 @@
+REPO_ROOT = '../../'  # autonomous_vehicles repo root.
+
 import torch
 import torch.nn.functional as F
 import wandb
 import tqdm
 import numpy as np
 import random
+
+# Adjust relative path so that this script can find the other code modules:
+import sys
+sys.path.append(REPO_ROOT+'code/')
 
 from dqn.q_network import Qnetwork
 from dqn.agent import Agent
@@ -41,6 +47,7 @@ TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 3_000 # (light blue, pink, gold, lime g
 REWARD_SCALING = 1./100.
 SEED = 1
 SAVE_PATH = './saved-models/trained_model_'
+#SAVE_PATH = REPO_ROOT+'models/trained_model'
 #####################
 
 
@@ -90,10 +97,7 @@ def main():
     np.random.seed(SEED)
     random.seed(SEED)
 
-    # Initialize wandb
-    wandb.init(project="cs286", name="tuning_dqn-avs")
-
-    # Define a ring road environment:
+    # Define simulation parameters:
     road_params = {'num_avs': 2,
                    'av_even_spacing': True,
                    'num_vehicles': 10,
@@ -103,13 +107,39 @@ def main():
                    'av_activate': 0,
                    'seed': 286,
                    'learning_mode': True}
+    past_steps = 3
+    agent_commands = [-1.0, -0.1, 0.0, 0.1, 1.0] # (brown + priors)
+    # agent_commands=[-5.0, -1.0, 0.0, 1.0, 5.0]  # (grey)
+    # agent_commands=[-4.0, -1.0, -0.1, 0.0, 0.1, 1.0, 4.0] # (peach)
+    # agent_commands=[-2.0, -0.1, 0.0, 0.1, 2.0]  # (dark blue)
+    agent_commands_string = "|".join([str(comm) for comm in agent_commands])  # W&B charts can't group by lists.
+    config = {
+        **road_params,
+        'past_steps' : past_steps,
+        'agent_commands' : agent_commands,
+        'agent_commands_string' : agent_commands_string,
+        'LAYER_1_NODES' : LAYER_1_NODES,
+        'LAYER_2_NODES' : LAYER_2_NODES,
+        'GAMMA' : GAMMA,
+        'EPS_DECAY_RATE' : EPS_DECAY_RATE,
+        'LR' : LR,
+        'BATCH_SIZE' : BATCH_SIZE,
+        'NUM_EPISODES' : NUM_EPISODES,
+        'MAX_TIMESTEPS' : MAX_TIMESTEPS,
+        'REPLAY_MEMORY_SIZE' : REPLAY_MEMORY_SIZE,
+        'TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE' : TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE,
+        'REWARD_SCALING' : REWARD_SCALING,
+        'SEED' : SEED,
+    }
+
+    # Initialize wandb
+    wandb.init(project="cs286", name="tuning_dqn-avs", config=config)
+
+    # Define a ring road environment:
     road = RingRoad(**road_params)
     env = Game(road = road,
-               agent_commands = [-1.0, -0.1, 0.0, 0.1, 1.0], # (brown + priors)
-               # agent_commands=[-5.0, -1.0, 0.0, 1.0, 5.0],  # (grey)
-               # agent_commands=[-4.0, -1.0, -0.1, 0.0, 0.1, 1.0, 4.0], # (peach)
-               # agent_commands=[-2.0, -0.1, 0.0, 0.1, 2.0],  # (dark blue)
-               past_steps = 3,
+               agent_commands = agent_commands,
+               past_steps = past_steps,
                max_seconds = None)
 
     replay_memory = ReplayMemory(memory_size=REPLAY_MEMORY_SIZE)
@@ -181,9 +211,10 @@ def main():
                 print(f"\tOn overall timestep {agent.current_timestep_number}")
                 print(f"\tReplay memory now has {len(agent.replay_memory.memory)} transitions")
                 agent.target_network.load_state_dict(agent.q_network.state_dict())
-                full_path = SAVE_PATH + str(i_episode + 1)
+                full_path = "{}{}_{}.pt".format(SAVE_PATH, wandb.run.id, i_episode+1)
                 torch.save(agent.q_network.state_dict(), full_path)
                 print(f'\tModel saved to {full_path}')
+                wandb.save(full_path)  # Save model to wandb.
 
     print("\n****Training Complete****\n")
 
