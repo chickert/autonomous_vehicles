@@ -44,6 +44,7 @@ REPLAY_MEMORY_SIZE = 50_000 # (magenta, green, light blue, pink, gold, lime gree
 # TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 2_000 # (magenta, light blue)
 # TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 1_000 # (green)
 TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 3_000 # (light blue, pink, gold, lime green, brown, grey, dark blue)
+WANDB_TSTEP = 50
 REWARD_SCALING = 1./100.
 SEED = 1
 SAVE_PATH = './saved-models/trained_model_'
@@ -104,7 +105,7 @@ def main():
                    'ring_length': 100.0,
                    'starting_noise': 1.0,
                    'temporal_res': 0.5,
-                   'av_activate': 0,
+                   'av_activate': MAX_TIMESTEPS,
                    'seed': 286,
                    'learning_mode': True}
     past_steps = 3
@@ -165,6 +166,10 @@ def main():
         decay_rate=EPS_DECAY_RATE
     )
 
+    # full_path = f"{SAVE_PATH}{wandb.run.id}_q_network.pt"
+    # torch.save(agent.q_network, full_path)
+    # wandb.save(full_path)  # Save full model (not just state) to wandb.
+
     list_of_rewards_for_all_episodes = []
 
     tq = tqdm.tqdm()
@@ -195,7 +200,7 @@ def main():
                   list_of_rewards_for_all_episodes=list_of_rewards_for_all_episodes,
                   env=env,
                   tstep=agent.current_timestep_number,
-                  wandb_tstep=TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE)
+                  wandb_tstep=WANDB_TSTEP)
 
             observation = next_observation
 
