@@ -129,4 +129,4 @@ dmypy.json
 .pyre/
 
 # Weights and biases folder:
-code/dqn/wandb/*
+*/wandb/*
