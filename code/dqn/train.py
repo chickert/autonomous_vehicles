@@ -1,4 +1,3 @@
-# Model under construction
 import torch
 import torch.nn.functional as F
 import wandb
@@ -18,19 +17,30 @@ from learning import Game
 LAYER_1_NODES = 512
 LAYER_2_NODES = 256
 GAMMA = 0.999
-EPS_DECAY_RATE = 0.999985
-# EPS_DECAY_RATE = 0.999980
-LR = 1e-4
+# EPS_DECAY_RATE = 0.999985 # (orange, lime green)
+# EPS_DECAY_RATE = 0.999977 # (teal)
+EPS_DECAY_RATE = 0.999977 # (magenta, green, light blue, pink, gold, grey, peach, dark blue)
+# EPS_DECAY_RATE = 0.999700 # (brown)
+# LR = 1e-4 # (green + priors)
+LR = 5e-4 # (light blue, lime green, brown, grey)
+# LR = 3e-4 # (peach, dark blue)
+# LR = 1e-3 # (pink)
+# LR = 6e-5 # (gold)
 BATCH_SIZE = 256
-NUM_EPISODES = 15_000
+NUM_EPISODES = 6_000
 MAX_TIMESTEPS = 200
-REPLAY_MEMORY_SIZE = 20_000
-# REPLAY_MEMORY_SIZE = 50_000
-TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 2_000
-# TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 5_000
+# REPLAY_MEMORY_SIZE = 20_000 # (orange)
+# REPLAY_MEMORY_SIZE = 50_000 # (teal)
+REPLAY_MEMORY_SIZE = 50_000 # (magenta, green, light blue, pink, gold, lime green, brown, grey, peach)
+# REPLAY_MEMORY_SIZE = 80_000 # (dark blue)
+# TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 2_000 # (orange)
+# TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 5_000 # (teal)
+# TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 2_000 # (magenta, light blue)
+# TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 1_000 # (green)
+TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 3_000 # (light blue, pink, gold, lime green, brown, grey, dark blue)
 REWARD_SCALING = 1./100.
 SEED = 1
-SAVE_PATH = './testrun_trained_model_'
+SAVE_PATH = './saved-models/trained_model_'
 #####################
 
 
@@ -80,7 +90,7 @@ def main():
     random.seed(SEED)
 
     # Initialize wandb
-    wandb.init(project="cs286", name="test_dqn-avs")
+    wandb.init(project="cs286", name="tuning_dqn-avs")
 
     # Define a ring road environment:
     road_params = {'num_avs': 2,
@@ -94,7 +104,10 @@ def main():
                    'learning_mode': True}
     road = RingRoad(**road_params)
     env = Game(road = road,
-               agent_commands = [-1.0, -0.1, 0.0, 0.1, 1.0],
+               agent_commands = [-1.0, -0.1, 0.0, 0.1, 1.0], # (brown + priors)
+               # agent_commands=[-5.0, -1.0, 0.0, 1.0, 5.0],  # (grey)
+               # agent_commands=[-4.0, -1.0, -0.1, 0.0, 0.1, 1.0, 4.0], # (peach)
+               # agent_commands=[-2.0, -0.1, 0.0, 0.1, 2.0],  # (dark blue)
                past_steps = 3,
                max_seconds = None)
 
@@ -165,8 +178,9 @@ def main():
                 print(f"\tOn overall timestep {agent.current_timestep_number}")
                 print(f"\tReplay memory now has {len(agent.replay_memory.memory)} transitions")
                 agent.target_network.load_state_dict(agent.q_network.state_dict())
-                # torch.save(agent.q_network.state_dict(), SAVE_PATH + str(i_episode + 1))
-                # print(f'\tModel saved to {SAVE_PATH}')
+                full_path = SAVE_PATH + str(i_episode + 1)
+                torch.save(agent.q_network.state_dict(), full_path)
+                print(f'\tModel saved to {full_path}')
 
     print("\n****Training Complete****\n")
 

@@ -20,7 +20,7 @@ class Agent:
 
     def get_e_greedy_action(self, observation, env):
         # self.epsilon = self.epsilon * self.eps_decay_rate
-        self.epsilon = np.clip(self.epsilon * self.eps_decay_rate, a_min=0.05, a_max=None)
+        self.epsilon = np.clip(self.epsilon * self.eps_decay_rate, a_min=0.1, a_max=None)
         if random.random() < self.epsilon:
             # Take random action
             action = env.action_space.sample()
