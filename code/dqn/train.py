@@ -204,11 +204,6 @@ def main():
 
             observation = next_observation
 
-            if done:
-                list_of_rewards_for_all_episodes.append(np.sum(ith_episode_rewards))
-                # print("Episode finished after {} timesteps".format(t + 1))
-                break
-
             if agent.current_timestep_number % TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE == 0:
                 tq.update(1)
                 print("\nUpdating target network")
@@ -220,6 +215,13 @@ def main():
                 torch.save(agent.q_network.state_dict(), full_path)
                 print(f'\tModel saved to {full_path}')
                 wandb.save(full_path)  # Save model to wandb.
+
+            if done:
+                # print("Episode finished after {} timesteps".format(t + 1))
+                break
+
+        # Add episode rewards:
+        list_of_rewards_for_all_episodes.append(np.sum(ith_episode_rewards))
 
     print("\n****Training Complete****\n")
 
