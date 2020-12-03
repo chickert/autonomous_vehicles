@@ -44,11 +44,12 @@ REPLAY_MEMORY_SIZE = 50_000 # (magenta, green, light blue, pink, gold, lime gree
 # TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 2_000 # (magenta, light blue)
 # TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 1_000 # (green)
 TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 3_000 # (light blue, pink, gold, lime green, brown, grey, dark blue)
-WANDB_TSTEP = 50
+WANDB_TSTEP = 1_000
 REWARD_SCALING = 1./100.
 SEED = 1
 SAVE_PATH = './saved-models/trained_model_'
 #SAVE_PATH = REPO_ROOT+'models/trained_model'
+TUNING_DESCRIPTION = "Same tuning as 'light blue' version."
 #####################
 
 
@@ -105,7 +106,7 @@ def main():
                    'ring_length': 100.0,
                    'starting_noise': 1.0,
                    'temporal_res': 0.5,
-                   'av_activate': MAX_TIMESTEPS,
+                   'av_activate': 0,
                    'seed': 286,
                    'learning_mode': True}
     past_steps = 3
@@ -134,7 +135,10 @@ def main():
     }
 
     # Initialize wandb
-    wandb.init(project="cs286", name="tuning_dqn-avs", config=config)
+    wandb.init(
+        project="cs286", name="tuning_dqn-avs", config=config,
+        notes = TUNING_DESCRIPTION
+    )
 
     # Define a ring road environment:
     road = RingRoad(**road_params)
