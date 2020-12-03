@@ -48,6 +48,8 @@ REPLAY_MEMORY_SIZE = 250_000 # (magenta, green, light blue, pink, gold, lime gre
 # TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 1_000 # (green)
 # TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 3_000 # (light blue, pink, gold, lime green, brown, grey, dark blue, black)
 TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 6_000 # (light blue, pink, gold, lime green, brown, grey, dark blue, black)
+# INIT_REPLAY_MEMORY = BATCH_SIZE # (orange, teal, magenta, green, light blue, pink, gold, lime green, brown, grey, peach, black)
+INIT_REPLAY_MEMORY = REPLAY_MEMORY_SIZE
 WANDB_TSTEP = TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE
 REWARD_SCALING = 1./100.
 SEED = 1
@@ -58,15 +60,13 @@ TUNING_DESCRIPTION = "Same tuning as 'light blue' version."
 
 
 def train(agent, gamma, list_of_rewards_for_all_episodes, env, wandb_tstep):
-    # if len(agent.replay_memory.memory) <= agent.batch_size:
-    #     return
-    if len(agent.replay_memory.memory) < REPLAY_MEMORY_SIZE:
+
+    if len(agent.replay_memory.memory) <= INIT_REPLAY_MEMORY:
         if len(agent.replay_memory.memory) % 5_000 == 0:
             print(f'Replay Memory now has {len(agent.replay_memory.memory)} transitions')
         return
 
-    # if len(agent.replay_memory.memory) == agent.batch_size + 1:
-    if len(agent.replay_memory.memory) == REPLAY_MEMORY_SIZE:
+    if len(agent.replay_memory.memory) == INIT_REPLAY_MEMORY + 1:
         print(f"""Replay memory now has {len(agent.replay_memory.memory)} transitions,
             which is sufficient to begin training.
             """)
@@ -139,6 +139,7 @@ def main():
         'NUM_EPISODES' : NUM_EPISODES,
         'MAX_TIMESTEPS' : MAX_TIMESTEPS,
         'REPLAY_MEMORY_SIZE' : REPLAY_MEMORY_SIZE,
+        'INIT_REPLAY_MEMORY' : INIT_REPLAY_MEMORY,
         'TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE' : TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE,
         'REWARD_SCALING' : REWARD_SCALING,
         'SEED' : SEED,
@@ -178,7 +179,7 @@ def main():
         replay_memory=replay_memory,
         batch_size=BATCH_SIZE,
         decay_rate=EPS_DECAY_RATE,
-        decay_starts_at=REPLAY_MEMORY_SIZE,
+        decay_starts_at=INIT_REPLAY_MEMORY,
     )
     # Save config:
     network_architecture = {
