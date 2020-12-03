@@ -26,26 +26,31 @@ LAYER_2_NODES = 256
 GAMMA = 0.999
 # EPS_DECAY_RATE = 0.999985 # (orange, lime green)
 # EPS_DECAY_RATE = 0.999977 # (teal)
-EPS_DECAY_RATE = 0.999977 # (magenta, green, light blue, pink, gold, grey, peach, dark blue)
+# EPS_DECAY_RATE = 0.999977 # (magenta, green, light blue, pink, gold, grey, peach, dark blue, black)
 # EPS_DECAY_RATE = 0.999700 # (brown)
+EPS_DECAY_RATE = 0.999980
 # LR = 1e-4 # (green + priors)
-LR = 5e-4 # (light blue, lime green, brown, grey)
+# LR = 5e-4 # (light blue, lime green, brown, grey, black)
 # LR = 3e-4 # (peach, dark blue)
 # LR = 1e-3 # (pink)
 # LR = 6e-5 # (gold)
+LR = 3e-4
 BATCH_SIZE = 256
-NUM_EPISODES = 6_000
+NUM_EPISODES = 200_000
 MAX_TIMESTEPS = 200
 # REPLAY_MEMORY_SIZE = 20_000 # (orange)
 # REPLAY_MEMORY_SIZE = 50_000 # (teal)
-REPLAY_MEMORY_SIZE = 50_000 # (magenta, green, light blue, pink, gold, lime green, brown, grey, peach)
+REPLAY_MEMORY_SIZE = 250_000 # (magenta, green, light blue, pink, gold, lime green, brown, grey, peach, black)
 # REPLAY_MEMORY_SIZE = 80_000 # (dark blue)
 # TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 2_000 # (orange)
 # TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 5_000 # (teal)
 # TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 2_000 # (magenta, light blue)
 # TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 1_000 # (green)
-TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 3_000 # (light blue, pink, gold, lime green, brown, grey, dark blue)
-WANDB_TSTEP = 1_000
+# TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 3_000 # (light blue, pink, gold, lime green, brown, grey, dark blue, black)
+TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 6_000 # (light blue, pink, gold, lime green, brown, grey, dark blue, black)
+# INIT_REPLAY_MEMORY = BATCH_SIZE # (orange, teal, magenta, green, light blue, pink, gold, lime green, brown, grey, peach, black)
+INIT_REPLAY_MEMORY = REPLAY_MEMORY_SIZE
+WANDB_TSTEP = TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE
 REWARD_SCALING = 1./100.
 SEED = 1
 SAVE_PATH = './saved-models/trained_model_'
@@ -55,10 +60,13 @@ TUNING_DESCRIPTION = "Same tuning as 'light blue' version."
 
 
 def train(agent, gamma, list_of_rewards_for_all_episodes, env, wandb_tstep):
-    if len(agent.replay_memory.memory) <= agent.batch_size:
+
+    if len(agent.replay_memory.memory) <= INIT_REPLAY_MEMORY:
+        if len(agent.replay_memory.memory) % 5_000 == 0:
+            print(f'Replay Memory now has {len(agent.replay_memory.memory)} transitions')
         return
 
-    if len(agent.replay_memory.memory) == agent.batch_size + 1:
+    if len(agent.replay_memory.memory) == INIT_REPLAY_MEMORY + 1:
         print(f"""Replay memory now has {len(agent.replay_memory.memory)} transitions,
             which is sufficient to begin training.
             """)
@@ -115,6 +123,33 @@ def main():
     # agent_commands=[-5.0, -1.0, 0.0, 1.0, 5.0]  # (grey)
     # agent_commands=[-4.0, -1.0, -0.1, 0.0, 0.1, 1.0, 4.0] # (peach)
     # agent_commands=[-2.0, -0.1, 0.0, 0.1, 2.0]  # (dark blue)
+    # agent_commands=[-0.5, -0.1, 0.0, 0.1, 0.5],  # (black)
+    agent_commands_string = "|".join([str(comm) for comm in agent_commands])  # W&B charts can't group by lists.
+    config = {
+        **road_params,
+        'past_steps' : past_steps,
+        'agent_commands' : agent_commands,
+        'agent_commands_string' : agent_commands_string,
+        'LAYER_1_NODES' : LAYER_1_NODES,
+        'LAYER_2_NODES' : LAYER_2_NODES,
+        'GAMMA' : GAMMA,
+        'EPS_DECAY_RATE' : EPS_DECAY_RATE,
+        'LR' : LR,
+        'BATCH_SIZE' : BATCH_SIZE,
+        'NUM_EPISODES' : NUM_EPISODES,
+        'MAX_TIMESTEPS' : MAX_TIMESTEPS,
+        'REPLAY_MEMORY_SIZE' : REPLAY_MEMORY_SIZE,
+        'INIT_REPLAY_MEMORY' : INIT_REPLAY_MEMORY,
+        'TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE' : TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE,
+        'REWARD_SCALING' : REWARD_SCALING,
+        'SEED' : SEED,
+    }
+
+    # Initialize wandb
+    wandb.init(
+        project="cs286", name="tuning_dqn-avs", config=config,
+        note="Fill a large replay memory with random moves before beginning training and epsilon decay.",
+    )
 
     # Define a ring road environment:
     road = RingRoad(**road_params)
@@ -143,7 +178,8 @@ def main():
         target_network=target_network,
         replay_memory=replay_memory,
         batch_size=BATCH_SIZE,
-        decay_rate=EPS_DECAY_RATE
+        decay_rate=EPS_DECAY_RATE,
+        decay_starts_at=INIT_REPLAY_MEMORY,
     )
     # Save config:
     network_architecture = {
