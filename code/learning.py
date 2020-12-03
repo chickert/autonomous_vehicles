@@ -93,17 +93,14 @@ class Game:
         # if self.road.max_speed:  # Normalize by max velocity, if applicable.
         #     mean_velocity = mean_velocity / self.road.max_speed
 
-        # Check for crashes and crowding:
+        # Check for crashes:
         crashes = 0
-        crowding = 0
         for vehicle in self.road.vehicles:
             if self.road.check_crash(vehicle=vehicle, raise_error=False):
                 crashes += 1  # Check if the vehicle collided with its lead.
-            if self.road.check_crowding(vehicle=vehicle, raise_warning=False, pct=0.1):
-                crowding += 1  # Check if the vehicle left less than 10% of its lead's safety buffer.
 
         # Calculate total reward:
-        reward = mean_velocity - 1 * crowding - 10 * crashes
+        reward = mean_velocity - 10 * crashes
 
         return reward
 
