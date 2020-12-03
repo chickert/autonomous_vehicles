@@ -6,6 +6,7 @@ import wandb
 import tqdm
 import numpy as np
 import random
+import json
 
 # Adjust relative path so that this script can find the other code modules:
 import sys
@@ -114,31 +115,6 @@ def main():
     # agent_commands=[-5.0, -1.0, 0.0, 1.0, 5.0]  # (grey)
     # agent_commands=[-4.0, -1.0, -0.1, 0.0, 0.1, 1.0, 4.0] # (peach)
     # agent_commands=[-2.0, -0.1, 0.0, 0.1, 2.0]  # (dark blue)
-    agent_commands_string = "|".join([str(comm) for comm in agent_commands])  # W&B charts can't group by lists.
-    config = {
-        **road_params,
-        'past_steps' : past_steps,
-        'agent_commands' : agent_commands,
-        'agent_commands_string' : agent_commands_string,
-        'LAYER_1_NODES' : LAYER_1_NODES,
-        'LAYER_2_NODES' : LAYER_2_NODES,
-        'GAMMA' : GAMMA,
-        'EPS_DECAY_RATE' : EPS_DECAY_RATE,
-        'LR' : LR,
-        'BATCH_SIZE' : BATCH_SIZE,
-        'NUM_EPISODES' : NUM_EPISODES,
-        'MAX_TIMESTEPS' : MAX_TIMESTEPS,
-        'REPLAY_MEMORY_SIZE' : REPLAY_MEMORY_SIZE,
-        'TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE' : TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE,
-        'REWARD_SCALING' : REWARD_SCALING,
-        'SEED' : SEED,
-    }
-
-    # Initialize wandb
-    wandb.init(
-        project="cs286", name="tuning_dqn-avs", config=config,
-        notes = TUNING_DESCRIPTION
-    )
 
     # Define a ring road environment:
     road = RingRoad(**road_params)
@@ -169,6 +145,56 @@ def main():
         batch_size=BATCH_SIZE,
         decay_rate=EPS_DECAY_RATE
     )
+    # Save config:
+    network_architecture = {
+        'observation_shape' : env.observation_space.shape[0],
+        'num_actions' : env.action_space.n,
+        'layer_1_nodes' : LAYER_1_NODES,
+        'layer_2_nodes' : LAYER_2_NODES,
+        'lr' : LR,
+    }
+    game_params = {
+        'past_steps' : past_steps,
+        'agent_commands' : agent_commands,
+    }
+    training_params = {
+        'LAYER_1_NODES' : LAYER_1_NODES,
+        'LAYER_2_NODES' : LAYER_2_NODES,
+        'GAMMA' : GAMMA,
+        'EPS_DECAY_RATE' : EPS_DECAY_RATE,
+        'LR' : LR,
+        'BATCH_SIZE' : BATCH_SIZE,
+        'NUM_EPISODES' : NUM_EPISODES,
+        'MAX_TIMESTEPS' : MAX_TIMESTEPS,
+        'REPLAY_MEMORY_SIZE' : REPLAY_MEMORY_SIZE,
+        'TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE' : TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE,
+        'REWARD_SCALING' : REWARD_SCALING,
+        'SEED' : SEED,
+    }
+
+    # Build dictionary of all parameters (to upload to wandb)
+    config = dict()
+    config.update(road_params)
+    config.update(network_architecture)
+    config.update(game_params)
+    config.update(training_params)
+
+    # Initialize wandb
+    wandb.init(
+        project="cs286", name="tuning_dqn-avs", config=config,
+        notes = TUNING_DESCRIPTION
+    )
+
+    # Save configuration info to a json file (for replay):
+    replay_info = {
+        'road_info' : road_params,
+        'game_info' : game_params,
+        'network_info' : network_architecture,
+    }
+    replay_path = f"{SAVE_PATH}{wandb.run.id}_replay_info.json"
+    with open(replay_path, 'w') as f:
+        json.dump(replay_info, f, indent=4)
+    wandb.save(replay_path)
 
     # full_path = f"{SAVE_PATH}{wandb.run.id}_q_network.pt"
     # torch.save(agent.q_network, full_path)
