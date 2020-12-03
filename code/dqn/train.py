@@ -6,6 +6,7 @@ import wandb
 import tqdm
 import numpy as np
 import random
+import json
 
 # Adjust relative path so that this script can find the other code modules:
 import sys
@@ -52,6 +53,7 @@ REWARD_SCALING = 1./100.
 SEED = 1
 SAVE_PATH = './saved-models/trained_model_'
 #SAVE_PATH = REPO_ROOT+'models/trained_model'
+TUNING_DESCRIPTION = "Same tuning as 'light blue' version."
 #####################
 
 
@@ -178,6 +180,56 @@ def main():
         decay_rate=EPS_DECAY_RATE,
         decay_starts_at=REPLAY_MEMORY_SIZE,
     )
+    # Save config:
+    network_architecture = {
+        'observation_shape' : env.observation_space.shape[0],
+        'num_actions' : env.action_space.n,
+        'layer_1_nodes' : LAYER_1_NODES,
+        'layer_2_nodes' : LAYER_2_NODES,
+        'lr' : LR,
+    }
+    game_params = {
+        'past_steps' : past_steps,
+        'agent_commands' : agent_commands,
+    }
+    training_params = {
+        'LAYER_1_NODES' : LAYER_1_NODES,
+        'LAYER_2_NODES' : LAYER_2_NODES,
+        'GAMMA' : GAMMA,
+        'EPS_DECAY_RATE' : EPS_DECAY_RATE,
+        'LR' : LR,
+        'BATCH_SIZE' : BATCH_SIZE,
+        'NUM_EPISODES' : NUM_EPISODES,
+        'MAX_TIMESTEPS' : MAX_TIMESTEPS,
+        'REPLAY_MEMORY_SIZE' : REPLAY_MEMORY_SIZE,
+        'TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE' : TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE,
+        'REWARD_SCALING' : REWARD_SCALING,
+        'SEED' : SEED,
+    }
+
+    # Build dictionary of all parameters (to upload to wandb)
+    config = dict()
+    config.update(road_params)
+    config.update(network_architecture)
+    config.update(game_params)
+    config.update(training_params)
+
+    # Initialize wandb
+    wandb.init(
+        project="cs286", name="tuning_dqn-avs", config=config,
+        notes = TUNING_DESCRIPTION
+    )
+
+    # Save configuration info to a json file (for replay):
+    replay_info = {
+        'road_info' : road_params,
+        'game_info' : game_params,
+        'network_info' : network_architecture,
+    }
+    replay_path = f"{SAVE_PATH}{wandb.run.id}_replay_info.json"
+    with open(replay_path, 'w') as f:
+        json.dump(replay_info, f, indent=4)
+    wandb.save(replay_path)
 
     # full_path = f"{SAVE_PATH}{wandb.run.id}_q_network.pt"
     # torch.save(agent.q_network, full_path)
