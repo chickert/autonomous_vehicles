@@ -148,7 +148,7 @@ def main():
     # Initialize wandb
     wandb.init(
         project="cs286", name="tuning_dqn-avs", config=config,
-        note=TUNING_DESCRIPTION,
+        notes=TUNING_DESCRIPTION,
     )
 
     # Define a ring road environment:
