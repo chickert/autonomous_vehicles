@@ -37,7 +37,7 @@ EPS_DECAY_RATE = 0.999980
 LR = 3e-4
 BATCH_SIZE = 256
 NUM_EPISODES = 200_000
-MAX_TIMESTEPS = 200
+MAX_TIMESTEPS = 400
 # REPLAY_MEMORY_SIZE = 20_000 # (orange)
 # REPLAY_MEMORY_SIZE = 50_000 # (teal)
 REPLAY_MEMORY_SIZE = 250_000 # (magenta, green, light blue, pink, gold, lime green, brown, grey, peach, black)
@@ -49,15 +49,15 @@ REPLAY_MEMORY_SIZE = 250_000 # (magenta, green, light blue, pink, gold, lime gre
 # TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 3_000 # (light blue, pink, gold, lime green, brown, grey, dark blue, black)
 TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 6_000 # (light blue, pink, gold, lime green, brown, grey, dark blue, black)
 # INIT_REPLAY_MEMORY = BATCH_SIZE # (orange, teal, magenta, green, light blue, pink, gold, lime green, brown, grey, peach, black)
-INIT_REPLAY_MEMORY = BATCH_SIZE * 32
+INIT_REPLAY_MEMORY = BATCH_SIZE
 # INIT_REPLAY_MEMORY = REPLAY_MEMORY_SIZE
-EPS_DECAY_START = BATCH_SIZE * 32 * 3
+EPS_DECAY_START = BATCH_SIZE * 32
 WANDB_TSTEP = 1_000
 REWARD_SCALING = 1./100.
 SEED = 1
 SAVE_PATH = './saved-models/trained_model_'
 #SAVE_PATH = REPO_ROOT+'models/trained_model'
-TUNING_DESCRIPTION = "Large initial replay buffer and delayed epsilon decay (and modified rewards)."
+TUNING_DESCRIPTION = "Delayed epsilon decay, no penalty for crowding, longer episodes."
 #####################
 
 
