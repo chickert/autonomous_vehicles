@@ -52,7 +52,7 @@ SAVE_PATH = './saved-models/trained_model_'
 #####################
 
 
-def train(agent, gamma, list_of_rewards_for_all_episodes, env, tstep, wandb_tstep):
+def train(agent, gamma, list_of_rewards_for_all_episodes, env, wandb_tstep):
     if len(agent.replay_memory.memory) <= agent.batch_size:
         return
 
@@ -82,7 +82,7 @@ def train(agent, gamma, list_of_rewards_for_all_episodes, env, tstep, wandb_tste
     # The torch.sum() component is to select the q_vals ONLY for the action taken
     # without having to use a loop
     loss = ((rewards + gamma * masks[:, 0] * next_state_q_vals - torch.sum(q_vals * actions_one_hot, -1))**2).mean()
-    if tstep % wandb_tstep == 0:
+    if agent.current_timestep_number % wandb_tstep == 0:
         wandb.log({'Loss': loss.detach().item(),
                    'Epsilon': agent.epsilon,
                    'Average reward over last 100 episodes': np.mean(list_of_rewards_for_all_episodes[-100:])},
@@ -199,7 +199,6 @@ def main():
                   gamma=GAMMA,
                   list_of_rewards_for_all_episodes=list_of_rewards_for_all_episodes,
                   env=env,
-                  tstep=agent.current_timestep_number,
                   wandb_tstep=WANDB_TSTEP)
 
             observation = next_observation
