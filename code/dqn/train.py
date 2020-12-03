@@ -55,7 +55,7 @@ REWARD_SCALING = 1./100.
 SEED = 1
 SAVE_PATH = './saved-models/trained_model_'
 #SAVE_PATH = REPO_ROOT+'models/trained_model'
-TUNING_DESCRIPTION = "Same tuning as 'light blue' version."
+TUNING_DESCRIPTION = "Fill a large replay memory with random moves before beginning training and epsilon decay."
 #####################
 
 
@@ -148,7 +148,7 @@ def main():
     # Initialize wandb
     wandb.init(
         project="cs286", name="tuning_dqn-avs", config=config,
-        note="Fill a large replay memory with random moves before beginning training and epsilon decay.",
+        note=TUNING_DESCRIPTION,
     )
 
     # Define a ring road environment:
