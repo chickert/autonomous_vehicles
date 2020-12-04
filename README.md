@@ -6,10 +6,10 @@ https://doi.org/10.1007/978-3-030-25446-9_12
 
 # Data structures:
 
-- [`structures.py`](code/structures.py) : Implementation of the `RingRoad` environment and `Vehicles`.
-- [`controllers.py`](code/controllers.py) : Implementation of controllers for HV and AV driving behavior.
-- [`animations.py`](code/animations.py) : Implementation of a wrapper class to animate a `RingRoad` simulation.
-- [`learning.py`](code/learning.py) : Implementation of wrapper for reinforcement learning in a `RingRoad` environment.
+- [`code/structures.py`](code/structures.py) : Implementation of the `RingRoad` environment and `Vehicles`.
+- [`code/controllers.py`](code/controllers.py) : Implementation of controllers for HV and AV driving behavior.
+- [`code/animations.py`](code/animations.py) : Implementation of a wrapper class to animate a `RingRoad` simulation.
+- [`code/learning.py`](code/learning.py) : Implementation of wrapper for reinforcement learning in a `RingRoad` environment.
 
 # Running the experiments:
 
@@ -19,18 +19,18 @@ The [`environment.yml`](environment.yml) file includes the dependences for runni
 
 The each experiment in presented in a Jupyter notebook:
 
-- [`Baseline-Results.ipynb`](notebooks/Baseline-Results.ipynb) presents results from out baseline simulation.
-- [`Extension-One.ipynb`](notebooks/Extension-One.ipynb) explores what happens to the baseline when we increase the number of AVs.
-- [`Extension-Two.ipynb`](notebooks/Extension-Two.ipynb) explores what happens to the baseline when we make HV behavior heterogeneous
-- [`Extension-Two.ipynb`](notebooks/Extension-Two.ipynb) explores what happens to the baseline when we add uncertainty to the AV's sensing.
-- [`Animations.ipynb`](notebooks/Animations.ipynb) presents `matplotlib` animations (which can be saved as `.gif`s) of each experiment.
+- [`notebooks/Baseline-Results.ipynb`](notebooks/Baseline-Results.ipynb) presents results from out baseline simulation.
+- [`notebooks/Extension-One.ipynb`](notebooks/Extension-One.ipynb) explores what happens to the baseline when we increase the number of AVs.
+- [`notebooks/Extension-Two.ipynb`](notebooks/Extension-Two.ipynb) explores what happens to the baseline when we make HV behavior heterogeneous
+- [`notebooks/Extension-Two.ipynb`](notebooks/Extension-Two.ipynb) explores what happens to the baseline when we add uncertainty to the AV's sensing.
+- [`notebooks/Animations.ipynb`](notebooks/Animations.ipynb) presents `matplotlib` animations (which can be saved as `.gif`s) of each experiment.
 
 The same experiments can also be run from the corresponding python files:
 
-- [`baseline.py`](code/baseline.py)
-- [`extension_one.py`](code/extension_one.py)
-- [`extension_two.py`](code/extension_two.py)
-- [`extension_three.py`](code/extension_three.py)
+- [`code/baseline.py`](code/baseline.py)
+- [`code/extension_one.py`](code/extension_one.py)
+- [`code/extension_two.py`](code/extension_two.py)
+- [`code/extension_three.py`](code/extension_three.py)
 
 The code runs best when executed from the code directory, e.g.:
 ```sh
@@ -42,9 +42,9 @@ python baseline.py
 
 - [`code/dqn/environment.yml`](code/dqn/environment.yml) file includes additional dependences (e.g. `pytorch`) for performing Q-Learning.
 - [`code/dqn/`](code/dqn/) contains code for Deep Q-Network (DQN) learning adapted from: https://github.com/chickert/reinforcement_learning/tree/master/DQN
-- [`learning.py`](code/learning.py) implements wrappers to connect the ring road simulation to the DQN framework.
-- [`Learning.ipynb`](notebooks/Learning.ipynb) provides simple demos of the data structures created for the RL framework.
+- [`code/learning.py`](code/learning.py) implements wrappers to connect the ring road simulation to the DQN framework.
 - [`code/dqn/train.py`](code/dqn/train.py) is a script that executes a DQN training run (and uploads the hyperparameters and results to [Weights & Biases](https://www.wandb.com/)).
+- [`code/notebooks/Learning.ipynb`](notebooks/Learning.ipynb) provides simple demos of the data structures created for the RL framework.
 
 ## Main assumptions:
 
