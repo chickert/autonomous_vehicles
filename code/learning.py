@@ -3,10 +3,14 @@ Wrapper classes for formulating a reinforcement learning problem.
 """
 
 import itertools
+import json
 
 import numpy as np
 import random
 
+import torch  # For loading weights into Q-network
+
+from dqn.q_network import Qnetwork
 from structures import RingRoad
 
 # Hide warnings about safe distance violation (still in development):
@@ -213,3 +217,63 @@ class ActionSpace:
         action = np.random.choice(range(self.n))
         return action
 
+class Replay:
+
+    @classmethod
+    def from_files(cls, run_id, ep_num, saved_models_dir='./dqn/saved-models/'):
+
+        # Build filepaths:
+        replay_path = f'{saved_models_dir}trained_model_{run_id}_replay_info.json'  # Parameters for Game object.
+        weights_path = f'{saved_models_dir}trained_model_{run_id}_{ep_num}.pt'  # Q-network weights.
+
+        # Load game parameters from json file:
+        with open(replay_path, 'r') as f:
+            replay_info = json.load(f)
+
+        road_info = replay_info['road_info']
+        game_info = replay_info['game_info']
+        network_info = replay_info['network_info']
+
+        road = RingRoad(**road_info)
+        game = Game(road=road,**game_info)
+        q_network = Qnetwork(**network_info)
+        q_network.load_state_dict(torch.load(weights_path))
+        q_network.eval()
+
+        replay = Replay(game, q_network)
+
+        return replay
+
+    def __init__(self, game, q_network):
+
+        self.game = game
+        self.q_network = q_network
+
+    @property
+    def road(self):
+        return self.game.road
+
+    @property
+    def done(self):
+        return self.game.done
+
+    def step(self):
+
+        # Query Q-network to find best action:
+        state = self.game.build_observation()
+        with torch.no_grad():
+            state = torch.Tensor(state)
+            q_vals = self.q_network.forward(state)
+        action = np.argmax(q_vals)
+
+        # Advance the simulation:
+        self.game.step(action)
+
+        # Check for crashes and crowding:
+        self.game.road.check_crash(raise_error=True)
+        self.game.road.check_crowding(raise_warning=True)
+
+    def build(self, seconds=60):
+
+        while (not self.game.done) and (self.game.road.t < seconds):
+            self.step()
