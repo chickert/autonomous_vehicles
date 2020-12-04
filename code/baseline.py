@@ -5,10 +5,6 @@ import pandas as pd
 
 import matplotlib.pyplot as plt
 
-# Adjust relative path so that this script can find the code modules:
-import sys
-sys.path.append('code/')
-
 from structures import *
 
 # Hide warnings about safe distance violation (still in development):
@@ -31,31 +27,31 @@ env.run(steps=total_steps)
 
 # Plot initial state:
 fig,ax = env.plot_ring(step=0, draw_cars_to_scale=True, draw_safety_buffer=False)
-filename = "outputs/environment_initial_state.png"
+filename = "../outputs/environment_initial_state.png"
 plt.savefig(filename)
 print("Saved : {} .".format(filename))
 
 # Plot state at activation:
 fig,ax = env.plot_ring(step=int(np.ceil(env.av_activate/env.dt))-1, draw_cars_to_scale=True, draw_safety_buffer=False)
-filename = "outputs/environment_before_activation.png"
+filename = "../outputs/environment_before_activation.png"
 plt.savefig(filename)
 print("Saved : {} .".format(filename))
 
 # Plot stable state:
 fig,ax = env.plot_ring(step=env.step, draw_cars_to_scale=True, draw_safety_buffer=False)
-filename = "outputs/environment_stable_state.png"
+filename = "../outputs/environment_stable_state.png"
 plt.savefig(filename)
 print("Saved : {} .".format(filename))
 
 # Plot position history:
 fig,ax = env.plot_positions()
-filename = "outputs/positions_history.png"
+filename = "../outputs/positions_history.png"
 plt.savefig(filename)
 print("Saved : {} .".format(filename))
 
 # Plot velocity history:
 fig,ax = env.plot_velocities(show_sigma=True)
-filename = "outputs/velocities_history.png"
+filename = "../outputs/velocities_history.png"
 plt.savefig(filename)
 print("Saved : {} .".format(filename))
 
@@ -68,7 +64,7 @@ df = pd.concat([
 ], axis=1)
 df_mean = df.mean(axis=0).to_frame(name='mean').transpose()
 df = pd.concat([df_mean,df], axis=0)
-filename = "outputs/velocity_standard_deviations.csv"
+filename = "../outputs/velocity_standard_deviations.csv"
 df.to_csv(filename, index=False)
 print("Saved : {} .".format(filename))
 
