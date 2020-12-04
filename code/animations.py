@@ -239,3 +239,46 @@ class Animation:
         writer = PillowWriter(fps=self.fps)
         self.anim.save(filepath, writer=writer)
         print("Saved : {} .".format(filepath))
+
+
+if __name__=='__main__':
+    print("""
+    This code implements the Animation class.
+    It also displays an example animation (baseline experiment).
+    To build animations of the extension experiments,
+    please run the notebooks/Animations.ipynb notebook intead.
+    """)
+
+    from structures import RingRoad
+
+    # Hide warnings about safe distance violation (still in development):
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning)
+
+    # Define simulation:
+    env = RingRoad(
+        num_vehicles = 22,  # The vechicles at index 0 is an A.V.
+        ring_length = 230.0,  # The road is a cicle.
+        starting_noise = 4.0,  # Uniformly add noise to starting positions.
+        temporal_res = 0.3,  # Set the size of simulation steps (seconds).
+        av_activate = 30,  # Set when the PID controller is activated.
+        seed = 286,  # Set a random seed.
+    )
+
+    # Run the simulation for set number of time steps:
+    total_time = 90  # In seconds.
+    total_steps = int(np.ceil(total_time/env.dt))
+    env.run(steps=total_steps)
+
+    # Build animation:
+    anim = Animation(env, speedup=5.0, interval=5, mode='script')
+    anim.animate_dashboard(draw_cars_to_scale=True, draw_safety_buffer=False, show_sigma=True)
+
+    # Show animation:
+    anim.show()
+
+    # # Save animation as GIF:
+    # anim.save_gif(filepath="../outputs/baseline.gif", overwrite=True)
+
+    # # Stop animation:
+    # anim.stop()
