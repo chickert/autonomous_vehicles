@@ -58,7 +58,7 @@ class Animation:
             plt.ion()
             plt.show(block=False)
         elif self.mode=='notebook':
-            plt.ioff()
+            pass
         else:
             raise NotImplementedError(f"Mode `{self.mode}` is not implemented.")
 
