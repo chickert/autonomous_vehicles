@@ -14,7 +14,7 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 
 class Animation:
 
-    def __init__(self, env, speedup=1.0, interval=1):
+    def __init__(self, env, speedup=1.0, interval=1, mode='notebook'):
         """
         Initialize an animation from the given environment.
 
@@ -35,11 +35,17 @@ class Animation:
         seconds = env.dt / speedup
         fps = frames / seconds
 
+        # Check mode:
+        valid_modes = ['script','notebook']
+        mode = valid_modes[0] if mode is None else mode
+        assert mode in valid_modes, f"{mode} is not a valid mode: {valid_modes}"
+
         # Store properties:
         self.env = env
         self.speedup = speedup
         self.interval = interval
         self.fps = fps
+        self.mode = mode
 
         # Store state:
         self.anim = None  # Most recent animation.
@@ -48,15 +54,25 @@ class Animation:
         """
         Start interactive plotting mode:
         """
-        plt.ion()
-        plt.show(block=False)
+        if self.mode=='script':
+            plt.ion()
+            plt.show(block=False)
+        elif self.mode=='notebook':
+            plt.ioff()
+        else:
+            raise NotImplementedError(f"Mode `{self.mode}` is not implemented.")
 
     def stop(self):
         """
         Stop interactive plotting mode:
         """
-        plt.ioff()
-        plt.close()
+        if self.mode=='script':
+            plt.ioff()
+            plt.close()
+        elif self.mode=='notebook':
+            pass
+        else:
+            raise NotImplementedError(f"Mode `{self.mode}` is not implemented.")
 
     def animate_ring(self, ax=None, **plot_options):
         """
@@ -204,7 +220,12 @@ class Animation:
         if not self.anim:
             raise RuntimeError("Animation has not been built.")
 
-        return self.anim
+        if self.mode=='script':
+            plt.show(block=True)
+        elif self.mode=='notebook':
+            plt.show(block=True)
+        else:
+            raise NotImplementedError(f"Mode `{self.mode}` is not implemented.")
 
     def save_gif(self, filepath, overwrite=False):
 
