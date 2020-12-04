@@ -35,32 +35,30 @@ REPLAY_MEMORY_SIZE = 50_000 # (purple)
 # REPLAY_MEMORY_SIZE = 250_000 # (big run)
 TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 3_000 # (purple)
 # TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 6_000 # (big run)
-INIT_REPLAY_MEMORY = REPLAY_MEMORY_SIZE  # purple run: Fill full memory with random actions before learning starts.
-EPS_DECAY_START = INIT_REPLAY_MEMORY  # purple run: Don't start epsilon decay until learning starts.
+INIT_REPLAY_MEMORY = BATCH_SIZE  # Start training once there is enough replay memory to fill one batch.
+EPS_DECAY_START = INIT_REPLAY_MEMORY  # Don't start epsilon decay until learning starts (i.e. after initial replay memory is built).
 WANDB_TSTEP = 1_000
 REWARD_SCALING = 1./100.
 SEED = 1
 SAVE_PATH = './saved-models/trained_model_'
 #SAVE_PATH = REPO_ROOT+'models/trained_model'
-TUNING_DESCRIPTION = "Fill replay memory before training starts."
+TUNING_DESCRIPTION = "Tuning parameters for the 'purple run'."
 #####################
 
 
 def train(agent, gamma, list_of_rewards_for_all_episodes, env, wandb_tstep):
-
-    if len(agent.replay_memory.memory) <= agent.batch_size:
-        return
     
-    # if len(agent.replay_memory.memory) < REPLAY_MEMORY_SIZE:
-    #     if len(agent.replay_memory.memory) % 5_000 == 0:
-    #         print(f'Replay Memory now has {len(agent.replay_memory.memory)} transitions')
-    #     return
+    if len(agent.replay_memory.memory) < INIT_REPLAY_MEMORY:
+        # Print status message (only used when building a big initial replay memory):
+        if len(agent.replay_memory.memory) % 5_000 == 0:
+            print(f'Replay Memory now has {len(agent.replay_memory.memory)} transitions')
+        return
 
-    # if len(agent.replay_memory.memory) == agent.batch_size + 1:
-    # if len(agent.replay_memory.memory) == REPLAY_MEMORY_SIZE:
-    #     print(f"""Replay memory now has {len(agent.replay_memory.memory)} transitions,
-    #         which is sufficient to begin training.
-    #         """)
+    if len(agent.replay_memory.memory) == INIT_REPLAY_MEMORY + 1:
+        # Print status message when initial replay memory is build (typically one batch, but could be larger):
+        print(f"""Replay memory now has {len(agent.replay_memory.memory)} transitions,
+            which is sufficient to begin training.
+            """)
 
     transitions = agent.replay_memory.sample(agent.batch_size)
 
