@@ -1,9 +1,16 @@
+REPO_ROOT = '../../'  # autonomous_vehicles repo root.
+
 import torch
 import torch.nn.functional as F
 import wandb
 import tqdm
 import numpy as np
 import random
+import json
+
+# Adjust relative path so that this script can find the other code modules:
+import sys
+sys.path.append(REPO_ROOT+'code/')
 
 from dqn.q_network import Qnetwork
 from dqn.agent import Agent
@@ -28,25 +35,30 @@ REPLAY_MEMORY_SIZE = 50_000 # (purple)
 # REPLAY_MEMORY_SIZE = 250_000 # (big run)
 TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 3_000 # (purple)
 # TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE = 6_000 # (big run)
+INIT_REPLAY_MEMORY = BATCH_SIZE  # Start training once there is enough replay memory to fill one batch.
+EPS_DECAY_START = INIT_REPLAY_MEMORY  # Don't start epsilon decay until learning starts (i.e. after initial replay memory is built).
+WANDB_TSTEP = 1_000
 REWARD_SCALING = 1./100.
 SEED = 1
 SAVE_PATH = './saved-models/trained_model_'
+#SAVE_PATH = REPO_ROOT+'models/trained_model'
+TUNING_DESCRIPTION = "Tuning parameters for the 'purple run'."
 #####################
 
 
 def train(agent, gamma, list_of_rewards_for_all_episodes, env, wandb_tstep):
-    if len(agent.replay_memory.memory) <= agent.batch_size:
+    
+    if len(agent.replay_memory.memory) < INIT_REPLAY_MEMORY:
+        # Print status message (only used when building a big initial replay memory):
+        if len(agent.replay_memory.memory) % 5_000 == 0:
+            print(f'Replay Memory now has {len(agent.replay_memory.memory)} transitions')
         return
-    # if len(agent.replay_memory.memory) < REPLAY_MEMORY_SIZE:
-    #     if len(agent.replay_memory.memory) % 5_000 == 0:
-    #         print(f'Replay Memory now has {len(agent.replay_memory.memory)} transitions')
-    #     return
 
-    # if len(agent.replay_memory.memory) == agent.batch_size + 1:
-    # if len(agent.replay_memory.memory) == REPLAY_MEMORY_SIZE:
-    #     print(f"""Replay memory now has {len(agent.replay_memory.memory)} transitions,
-    #         which is sufficient to begin training.
-    #         """)
+    if len(agent.replay_memory.memory) == INIT_REPLAY_MEMORY + 1:
+        # Print status message when initial replay memory is build (typically one batch, but could be larger):
+        print(f"""Replay memory now has {len(agent.replay_memory.memory)} transitions,
+            which is sufficient to begin training.
+            """)
 
     transitions = agent.replay_memory.sample(agent.batch_size)
 
@@ -85,10 +97,7 @@ def main():
     np.random.seed(SEED)
     random.seed(SEED)
 
-    # Initialize wandb
-    wandb.init(project="cs286", name="tuning_dqn-avs")
-
-    # Define a ring road environment:
+    # Define simulation parameters:
     road_params = {'num_avs': 2,
                    'av_even_spacing': True,
                    'num_vehicles': 10,
@@ -98,11 +107,16 @@ def main():
                    'av_activate': 0,
                    'seed': 286,
                    'learning_mode': True}
+    game_params = {
+        'crowding_penalty' : 0,
+        'crash_penalty' : 10,
+        'past_steps' : 3,
+        'agent_commands' : [-1.0, -0.1, 0.0, 0.1, 1.0], # (purple + big run)
+    }
+
+    # Define a ring road environment:
     road = RingRoad(**road_params)
-    env = Game(road = road,
-               agent_commands = [-1.0, -0.1, 0.0, 0.1, 1.0],
-               past_steps = 3,
-               max_seconds = None)
+    env = Game(road = road, max_seconds = None, **game_params)
 
     replay_memory = ReplayMemory(memory_size=REPLAY_MEMORY_SIZE)
     q_network = Qnetwork(
@@ -125,8 +139,63 @@ def main():
         replay_memory=replay_memory,
         batch_size=BATCH_SIZE,
         decay_rate=EPS_DECAY_RATE,
-        decay_starts_at=REPLAY_MEMORY_SIZE,
+        decay_starts_at=EPS_DECAY_START,
     )
+
+    # Collect network and training parameters in dictionaries (for archiving):
+    network_architecture = {
+        'observation_shape' : env.observation_space.shape[0],
+        'num_actions' : env.action_space.n,
+        'layer_1_nodes' : LAYER_1_NODES,
+        'layer_2_nodes' : LAYER_2_NODES,
+        'lr' : LR,
+    }
+    training_params = {
+        'LAYER_1_NODES' : LAYER_1_NODES,
+        'LAYER_2_NODES' : LAYER_2_NODES,
+        'GAMMA' : GAMMA,
+        'EPS_DECAY_RATE' : EPS_DECAY_RATE,
+        'LR' : LR,
+        'BATCH_SIZE' : BATCH_SIZE,
+        'NUM_EPISODES' : NUM_EPISODES,
+        'MAX_TIMESTEPS' : MAX_TIMESTEPS,
+        'REPLAY_MEMORY_SIZE' : REPLAY_MEMORY_SIZE,
+        'INIT_REPLAY_MEMORY' : INIT_REPLAY_MEMORY,
+        'TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE' : TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE,
+        'REWARD_SCALING' : REWARD_SCALING,
+        'SEED' : SEED,
+    }
+
+    # Merge all the parameters into a single dictionary (for uploading to wandb):
+    config = dict()
+    config.update(road_params)
+    config.update(network_architecture)
+    config.update(game_params)
+    config.update(training_params)
+
+    # Initialize wandb
+    wandb.init(
+        project="cs286", name="tuning_dqn-avs",
+        config=config,  # Upload hyperparameters (just of archive purposes -- they don't actually control anything in wandb)
+        notes = TUNING_DESCRIPTION,  # Description of run.
+    )
+
+    # Save configuration info to a json file (for replay):
+    replay_info = {
+        'road_info' : road_params,
+        'game_info' : game_params,
+        'network_info' : network_architecture,
+    }
+    replay_path = f"{SAVE_PATH}{wandb.run.id}_replay_info.json"
+    with open(replay_path, 'w') as f:
+        json.dump(replay_info, f, indent=4)
+    wandb.save(replay_path)  # Upload to wandb for archiving.
+
+    # Save full model (not just state) locally:
+    full_path = f"{SAVE_PATH}{wandb.run.id}_q_network.pt"
+    torch.save(agent.q_network, full_path)
+    # Upload to wandb for archiving:
+    wandb.save(full_path)
 
     list_of_rewards_for_all_episodes = []
 
@@ -157,14 +226,9 @@ def main():
                   gamma=GAMMA,
                   list_of_rewards_for_all_episodes=list_of_rewards_for_all_episodes,
                   env=env,
-                  wandb_tstep=TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE)
+                  wandb_tstep=WANDB_TSTEP)
 
             observation = next_observation
-
-            if done:
-                list_of_rewards_for_all_episodes.append(np.sum(ith_episode_rewards))
-                # print("Episode finished after {} timesteps".format(t + 1))
-                break
 
             if agent.current_timestep_number % TIMESTEPS_BEFORE_TARGET_NETWORK_UPDATE == 0:
                 tq.update(1)
@@ -173,9 +237,19 @@ def main():
                 print(f"\tOn overall timestep {agent.current_timestep_number}")
                 print(f"\tReplay memory now has {len(agent.replay_memory.memory)} transitions")
                 agent.target_network.load_state_dict(agent.q_network.state_dict())
-                full_path = SAVE_PATH + str(i_episode + 1)
+                # Save model state locally:
+                full_path = "{}{}_{}.pt".format(SAVE_PATH, wandb.run.id, i_episode+1)
                 torch.save(agent.q_network.state_dict(), full_path)
                 print(f'\tModel saved to {full_path}')
+                # Upload model state to wandb:
+                wandb.save(full_path)
+
+            if done:
+                # print("Episode finished after {} timesteps".format(t + 1))
+                break
+
+        # Add episode rewards:
+        list_of_rewards_for_all_episodes.append(np.sum(ith_episode_rewards))
 
     print("\n****Training Complete****\n")
 

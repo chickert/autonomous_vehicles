@@ -16,7 +16,13 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 class Game:
 
-    def __init__(self, road, past_steps=3, agent_commands=[-2,-1,0,1,2], max_seconds=None):
+    def __init__(self, road,
+        past_steps=3,
+        agent_commands=[-2,-1,0,1,2],
+        crowding_penalty = 1,
+        crash_penalty = 10,
+        max_seconds=None,
+    ):
         
         # Bind RingRoad object to Game:
         self.road = road
@@ -32,6 +38,8 @@ class Game:
         self.agent_commands = agent_commands  # List of valid commands for each A.V.
         self.num_agents = self.road.num_avs  # Number of A.V.s being controlled.
         self.past_steps = past_steps  # How many steps into the past to include in observation.
+        self.crowding_penalty = crowding_penalty  # How many points to remove per vehicle that crash (in final step).
+        self.crash_penalty = crash_penalty  # How many points to remove per that crowds its lead (per step).
 
         # Game state:
         self.done = False
@@ -102,8 +110,7 @@ class Game:
             if self.road.check_crowding(vehicle=vehicle, raise_warning=False, pct=0.1):
                 crowding += 1  # Check if the vehicle left less than 10% of its lead's safety buffer.
 
-        # Calculate total reward:
-        reward = mean_velocity - 1 * crowding - 10 * crashes
+        reward = mean_velocity - self.crowding_penalty * crowding - self.crash_penalty * crashes
 
         return reward
 
