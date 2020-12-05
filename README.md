@@ -22,7 +22,7 @@ The each experiment in presented in a Jupyter notebook:
 - [`notebooks/Baseline-Results.ipynb`](notebooks/Baseline-Results.ipynb) presents results from out baseline simulation.
 - [`notebooks/Extension-One.ipynb`](notebooks/Extension-One.ipynb) explores what happens to the baseline when we increase the number of AVs.
 - [`notebooks/Extension-Two.ipynb`](notebooks/Extension-Two.ipynb) explores what happens to the baseline when we make HV behavior heterogeneous
-- [`notebooks/Extension-Two.ipynb`](notebooks/Extension-Two.ipynb) explores what happens to the baseline when we add uncertainty to the AV's sensing.
+- [`notebooks/Extension-Three.ipynb`](notebooks/Extension-Three.ipynb) explores what happens to the baseline when we add uncertainty to the AV's sensing.
 - [`notebooks/Animations.ipynb`](notebooks/Animations.ipynb) presents `matplotlib` animations (which can be saved as `.gif`s) of each experiment.
 
 The same experiments can also be run from the corresponding python files:
