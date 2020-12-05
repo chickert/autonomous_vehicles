@@ -277,3 +277,10 @@ class Replay:
 
         while (not self.game.done) and (self.game.road.t < seconds):
             self.step()
+
+
+if __name__=='__main__':
+    print("""
+    This code implements the Game and other helper classes for RL but does not perform Q-leaning.
+    The Deep- Q-Network is implemented in the code/dqn/train.py script.
+    """)

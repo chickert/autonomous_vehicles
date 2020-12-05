@@ -231,3 +231,21 @@ class LearningController(Controller):
         command = self._command
         self._command = None
         return command
+
+
+if __name__=='__main__':
+    print("""
+    This code implements the Controller classes but does not run simulations.
+    
+    To perform the baseline and extension simulations please run one of these scripts:
+        - code/baseline.py
+        - code/extension_one.py
+        - code/extension_two.py
+        - code/extension_three.py
+
+    or notebooks:
+        - notebooks/Baseline-Results.ipynb
+        - notebooks/Extension-One.ipynb
+        - notebooks/Extension-Two.ipynb
+        - notebooks/Extension-Three.ipynb
+    """)

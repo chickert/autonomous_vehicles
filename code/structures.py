@@ -1010,3 +1010,22 @@ class Robot(Vehicle):
     def reset_state(self):
         super().reset_state()
         self.state['active'] = True  # Flag to determine autonomous control.
+
+
+if __name__=='__main__':
+    print("""
+    This code implements the RingRoad and other data structures
+    but does not perform any simulation experiments.
+
+    To perform the baseline and extension simulations please run one of these scripts:
+        - code/baseline.py
+        - code/extension_one.py
+        - code/extension_two.py
+        - code/extension_three.py
+        
+    or notebooks:
+        - notebooks/Baseline-Results.ipynb
+        - notebooks/Extension-One.ipynb
+        - notebooks/Extension-Two.ipynb
+        - notebooks/Extension-Three.ipynb
+    """)

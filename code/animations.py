@@ -14,7 +14,7 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 
 class Animation:
 
-    def __init__(self, env, speedup=1.0, interval=1):
+    def __init__(self, env, speedup=1.0, interval=1, mode='notebook'):
         """
         Initialize an animation from the given environment.
 
@@ -35,11 +35,17 @@ class Animation:
         seconds = env.dt / speedup
         fps = frames / seconds
 
+        # Check mode:
+        valid_modes = ['script','notebook']
+        mode = valid_modes[0] if mode is None else mode
+        assert mode in valid_modes, f"{mode} is not a valid mode: {valid_modes}"
+
         # Store properties:
         self.env = env
         self.speedup = speedup
         self.interval = interval
         self.fps = fps
+        self.mode = mode
 
         # Store state:
         self.anim = None  # Most recent animation.
@@ -48,15 +54,30 @@ class Animation:
         """
         Start interactive plotting mode:
         """
-        plt.ion()
-        plt.show(block=False)
+        self._prev_isinteractive = plt.isinteractive
+        if self.mode=='script':
+            plt.ion()
+            plt.show(block=False)
+        elif self.mode=='notebook':
+            plt.ioff()
+        else:
+            raise NotImplementedError(f"Mode `{self.mode}` is not implemented.")
 
     def stop(self):
         """
         Stop interactive plotting mode:
         """
-        plt.ioff()
-        plt.close()
+        if self.mode=='script':
+            plt.ioff()
+            plt.close()
+        elif self.mode=='notebook':
+            pass
+        else:
+            raise NotImplementedError(f"Mode `{self.mode}` is not implemented.")
+        if self._prev_isinteractive:
+            plt.ion()
+        else:
+            plt.ioff()
 
     def animate_ring(self, ax=None, **plot_options):
         """
@@ -204,7 +225,12 @@ class Animation:
         if not self.anim:
             raise RuntimeError("Animation has not been built.")
 
-        return self.anim
+        if self.mode=='script':
+            plt.show(block=True)
+        elif self.mode=='notebook':
+            plt.show(block=True)
+        else:
+            raise NotImplementedError(f"Mode `{self.mode}` is not implemented.")
 
     def save_gif(self, filepath, overwrite=False):
 
@@ -218,3 +244,46 @@ class Animation:
         writer = PillowWriter(fps=self.fps)
         self.anim.save(filepath, writer=writer)
         print("Saved : {} .".format(filepath))
+
+
+if __name__=='__main__':
+    print("""
+    This code implements the Animation class.
+    It also displays an example animation (baseline experiment).
+    To build animations of the extension experiments,
+    please run the notebooks/Animations.ipynb notebook intead.
+    """)
+
+    from structures import RingRoad
+
+    # Hide warnings about safe distance violation (still in development):
+    import warnings
+    warnings.filterwarnings("ignore", category=UserWarning)
+
+    # Define simulation:
+    env = RingRoad(
+        num_vehicles = 22,  # The vechicles at index 0 is an A.V.
+        ring_length = 230.0,  # The road is a cicle.
+        starting_noise = 4.0,  # Uniformly add noise to starting positions.
+        temporal_res = 0.3,  # Set the size of simulation steps (seconds).
+        av_activate = 30,  # Set when the PID controller is activated.
+        seed = 286,  # Set a random seed.
+    )
+
+    # Run the simulation for set number of time steps:
+    total_time = 90  # In seconds.
+    total_steps = int(np.ceil(total_time/env.dt))
+    env.run(steps=total_steps)
+
+    # Build animation:
+    anim = Animation(env, speedup=5.0, interval=5, mode='script')
+    anim.animate_dashboard(draw_cars_to_scale=True, draw_safety_buffer=False, show_sigma=True)
+
+    # Show animation:
+    anim.show()
+
+    # # Save animation as GIF:
+    # anim.save_gif(filepath="../outputs/baseline.gif", overwrite=True)
+
+    # # Stop animation:
+    # anim.stop()
