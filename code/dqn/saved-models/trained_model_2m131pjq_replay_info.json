@@ -1,0 +1,30 @@
+{
+    "road_info": {
+        "num_avs": 2,
+        "av_even_spacing": true,
+        "num_vehicles": 10,
+        "ring_length": 100.0,
+        "starting_noise": 1.0,
+        "temporal_res": 0.5,
+        "av_activate": 0,
+        "seed": 456,
+        "learning_mode": true
+    },
+    "game_info": {
+        "past_steps": 3,
+        "agent_commands": [
+            -1.0,
+            -0.1,
+            0.0,
+            0.1,
+            1.0
+        ]
+    },
+    "network_info": {
+        "observation_shape": 30,
+        "num_actions": 25,
+        "layer_1_nodes": 512,
+        "layer_2_nodes": 256,
+        "lr": 0.0003
+    }
+}
