@@ -54,11 +54,12 @@ class Animation:
         """
         Start interactive plotting mode:
         """
+        self._prev_isinteractive = plt.isinteractive
         if self.mode=='script':
             plt.ion()
             plt.show(block=False)
         elif self.mode=='notebook':
-            pass
+            plt.ioff()
         else:
             raise NotImplementedError(f"Mode `{self.mode}` is not implemented.")
 
@@ -73,6 +74,10 @@ class Animation:
             pass
         else:
             raise NotImplementedError(f"Mode `{self.mode}` is not implemented.")
+        if self._prev_isinteractive:
+            plt.ion()
+        else:
+            plt.ioff()
 
     def animate_ring(self, ax=None, **plot_options):
         """
